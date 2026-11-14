@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard · BrokerBuddy</title>
+{{template "style"}}{{template "navstyle"}}
+</head>
+<body>
+<main>
+{{template "nav" "dashboard"}}
+{{if .Flash}}<div class="card flash" role="status">{{.Flash}}</div>{{end}}
+{{if .Rep.Empty}}
+<div class="card"><h2>Welcome</h2><p>No transactions yet. <a href="/import">Import a CSV</a> from your bank, or connect a bank from the <a href="/transactions">Transactions</a> tab.</p></div>
+{{else}}
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+  <div class="mut">{{.Rep.From}} to {{.Rep.To}}</div>
+  <div class="seg" role="group" aria-label="Period">
+    {{range $m := (list 1 3 6 12 0)}}<a href="/?months={{$m}}"><button type="button" class="{{if eq $m $.Months}}on{{end}}">{{if eq $m 0}}All{{else}}{{$m}} mo{{end}}</button></a> {{end}}
+  </div>
+</div>
+
+<div class="kpis" style="margin-bottom:16px">
+  <div class="kpi"><span>Income / month</span><b class="pos">${{printf "%.0f" .Rep.IncomeM}}</b></div>
+  <div class="kpi"><span>Spending / month</span><b>${{printf "%.0f" .Rep.ExpensesM}}</b></div>
+  <div class="kpi"><span>Surplus / month</span><b class="{{if lt .Rep.SurplusM 0.0}}neg{{else}}pos{{end}}">${{printf "%.0f" .Rep.SurplusM}}</b></div>
+  <div class="kpi"><span>Savings rate</span><b class="{{if lt .SavingsRate 0.0}}neg{{end}}">{{printf "%.0f" .SavingsRate}}%</b></div>
+</div>
+
+{{if gt .Uncat 0}}<div class="card" role="note">{{.Uncat}} transactions are still <a href="/transactions?category=Uncategorized">Uncategorized</a>, so spending is only partly bucketed. Setting a few categories teaches the app to sort the rest.</div>{{end}}
+
+<div class="card"><h2>Income vs expenses by month</h2>
+  <div class="chartbox"><canvas id="c-monthly" role="img" aria-label="Monthly income versus expenses"></canvas></div>
+</div>
+
+<div class="grid">
+  <div class="card"><h2>Where the money goes (per month)</h2>
+    {{range .Top}}<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between"><a href="/transactions?category={{.Category}}">{{.Category}}</a><span>${{printf "%.0f" .Monthly}} · {{printf "%.0f" .Pct}}%</span></div><div class="bar" style="width:{{printf "%.0f" .Pct}}%"></div></div>{{end}}
+  </div>
+  <div class="card scroll"><h2>Recent transactions</h2>
+    <table>{{range .Recent}}<tr><td>{{.Date}}</td><td>{{.Name}}<div class="mut">{{.Category}}</div></td><td class="amt {{if lt .Amount 0.0}}in{{else}}out{{end}}">{{printf "%.2f" (neg .Amount)}}</td></tr>{{end}}</table>
+    <p><a href="/transactions">All transactions →</a></p>
+  </div>
+</div>
+<script src="/static/chart.umd.min.js"></script>
+<script>
+const D = {{.Data}};
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+Chart.defaults.color = css('--mut'); Chart.defaults.borderColor = css('--line');
+new Chart(document.getElementById('c-monthly'), {
+  type: 'bar',
+  data: { labels: D.Months, datasets: [
+    { type:'bar', label:'Income', data: D.Income, backgroundColor: css('--pos') },
+    { type:'bar', label:'Expenses', data: D.Expenses, backgroundColor: css('--neg') },
+    { type:'line', label:'Net', data: D.Net, borderColor: css('--acc'), backgroundColor: css('--acc'), tension: .25, pointRadius: 3 }
+  ]},
+  options: { responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+    scales:{ y:{ ticks:{ callback:v=>'$'+v.toLocaleString() } } },
+    plugins:{ tooltip:{ callbacks:{ label:c=>c.dataset.label+': $'+c.parsed.y.toLocaleString() } } } }
+});
+</script>
+{{end}}
+</main>
+</body>
+</html>

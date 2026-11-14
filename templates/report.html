@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lender view · BrokerBuddy</title>
+{{template "style"}}{{template "navstyle"}}
+<style>.lvl{display:inline-block;min-width:3.5em;font-weight:600}.high{color:var(--neg)}.med{color:#b54708}.low{color:var(--mut)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}.kpi b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+td.n{text-align:right;font-variant-numeric:tabular-nums}@media(prefers-color-scheme:dark){.med{color:#fdb022}}</style>
+</head>
+<body>
+<main>
+{{template "nav" "report"}}
+<header><h1>Lender view</h1>
+  <div>
+    {{range $m := (list 3 6 12)}}<a href="/report?months={{$m}}"><button type="button" {{if eq $m $.Months}}class="primary"{{end}}>{{$m}} mo</button></a> {{end}}
+    <a href="/report.csv?months={{.Months}}"><button type="button">Download CSV</button></a>
+  </div>
+</header>
+{{if .Empty}}<div class="card">No transactions yet. <a href="/import">Import a CSV</a> first.</div>{{else}}
+<div class="card">
+  <p class="mut">{{.From}} to {{.To}} (about {{printf "%.1f" .SpanMonths}} months). Monthly figures are averages. Lenders apply their own methods (e.g. the Household Expenditure Measure), so treat this as a preparation aid, not a prediction.</p>
+  <div class="kpis">
+    <div class="kpi"><span class="mut">Income / month</span><b>${{printf "%.0f" .IncomeM}}</b></div>
+    <div class="kpi"><span class="mut">Spending / month</span><b>${{printf "%.0f" .ExpensesM}}</b></div>
+    <div class="kpi"><span class="mut">Surplus / month</span><b class="{{if lt .SurplusM 0.0}}high{{end}}">${{printf "%.0f" .SurplusM}}</b></div>
+  </div>
+</div>
+
+{{if .Flags}}<div class="card"><h2>What an assessor may notice</h2>
+  {{range .Flags}}<div><span class="lvl {{.Level}}">{{if eq .Level "high"}}High{{else if eq .Level "med"}}Medium{{else}}Note{{end}}</span> {{.Text}}</div>{{end}}
+</div>{{end}}
+
+{{range .Groups}}{{if .Lines}}
+<div class="card scroll"><h2>{{.Name}}</h2>
+<table><tr><th>Category</th><th class="n" style="text-align:right">Total</th><th style="text-align:right">Per month</th><th style="text-align:right">% income</th><th style="text-align:right">Txns</th></tr>
+{{range .Lines}}<tr><td><a href="/transactions?category={{.Category}}">{{.Category}}</a></td><td class="n">${{printf "%.2f" .Total}}</td><td class="n">${{printf "%.0f" .Monthly}}</td><td class="n">{{if .Pct}}{{printf "%.0f" .Pct}}%{{end}}</td><td class="n">{{.Count}}</td></tr>{{end}}
+<tr><th>Subtotal</th><th class="n" style="text-align:right">${{printf "%.2f" .Total}}</th><th style="text-align:right">${{printf "%.0f" .Monthly}}</th><th></th><th></th></tr>
+</table></div>
+{{end}}{{end}}
+{{end}}
+</main>
+</body>
+</html>

@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Charts · BrokerBuddy</title>
+{{template "style"}}{{template "navstyle"}}
+<style>
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.filters fieldset{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:0}
+.filters legend{color:var(--mut);font-size:13px;padding:0 4px}
+.checks{max-height:150px;overflow:auto;display:flex;flex-direction:column;gap:2px}
+.checks label{display:flex;gap:6px;align-items:center;font-size:14px}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px}
+@media(max-width:520px){.charts{grid-template-columns:1fr}}
+.wide{grid-column:1/-1}.small{font-size:13px}
+</style>
+</head>
+<body>
+<main>
+{{template "nav" "charts"}}
+
+<div class="card">
+  <h2>Filters</h2>
+  <div class="filters">
+    <fieldset><legend>Period</legend>
+      <div class="seg" id="presets" role="group" aria-label="Period presets">
+        <button type="button" data-p="3">3 mo</button> <button type="button" data-p="6">6 mo</button>
+        <button type="button" data-p="12">12 mo</button> <button type="button" data-p="ytd">YTD</button>
+        <button type="button" data-p="all">All</button>
+      </div>
+      <label class="small">From <input type="date" id="from"></label>
+      <label class="small">To <input type="date" id="to"></label>
+    </fieldset>
+    <fieldset><legend>Show</legend>
+      <div class="seg" id="flow" role="group" aria-label="Flow">
+        <button type="button" data-f="both">Both</button> <button type="button" data-f="income">Income</button> <button type="button" data-f="expense">Spending</button>
+      </div>
+      <label class="small"><input type="checkbox" id="neutral"> Include transfers &amp; savings</label>
+      <label class="small">Group by <select id="gran"><option value="month">Month</option><option value="week">Week</option><option value="day">Day</option></select></label>
+      <label class="small">Search <input id="q" placeholder="description contains…"></label>
+    </fieldset>
+    <fieldset><legend>Accounts</legend><div class="checks" id="accts"></div></fieldset>
+    <fieldset><legend>Groups</legend><div class="checks" id="groups"></div></fieldset>
+    <fieldset><legend>Categories</legend><div class="checks" id="cats"></div>
+      <button type="button" id="catall" class="small">All</button> <button type="button" id="catnone" class="small">None</button></fieldset>
+  </div>
+  <p class="mut small" id="summary" role="status"></p>
+</div>
+
+<div class="kpis" style="margin-bottom:16px" id="kpis"></div>
+
+<div class="charts">
+  <div class="card wide"><h2>Income vs spending over time</h2><div class="chartbox"><canvas id="c-flow" role="img" aria-label="Income versus spending over time"></canvas></div></div>
+  <div class="card wide"><h2>Spending by category over time</h2><div class="chartbox"><canvas id="c-stack" role="img" aria-label="Stacked spending by category"></canvas></div></div>
+  <div class="card"><h2>Spending by category</h2><div class="chartbox"><canvas id="c-donut" role="img" aria-label="Spending share by category"></canvas></div></div>
+  <div class="card"><h2>Spending by group</h2><div class="chartbox"><canvas id="c-group" role="img" aria-label="Spending by group"></canvas></div></div>
+  <div class="card"><h2>Top merchants</h2><div class="chartbox"><canvas id="c-merch" role="img" aria-label="Top merchants by spend"></canvas></div></div>
+  <div class="card"><h2>Cumulative net (income − spending)</h2><div class="chartbox"><canvas id="c-cum" role="img" aria-label="Cumulative net over time"></canvas></div></div>
+  <div class="card"><h2>Spending by day of week</h2><div class="chartbox"><canvas id="c-dow" role="img" aria-label="Spending by day of week"></canvas></div></div>
+  <div class="card scroll"><h2>Largest transactions</h2><table id="big"></table></div>
+</div>
+
+<script src="/static/chart.umd.min.js"></script>
+<script>
+(async function () {
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+Chart.defaults.color = css('--mut'); Chart.defaults.borderColor = css('--line');
+const PAL = ['#3b82f6','#f97316','#10b981','#a855f7','#eab308','#ec4899','#14b8a6','#ef4444','#6366f1','#84cc16','#06b6d4','#d946ef'];
+const money = v => (v < 0 ? '-$' : '$') + Math.abs(Math.round(v)).toLocaleString();
+const $ = id => document.getElementById(id);
+
+const res = await fetch('/api/transactions'); const API = await res.json();
+const groupOf = {}; API.categories.forEach(c => groupOf[c.Name] = c.Group);
+const T = API.txns.map(r => ({ date: r[0], amt: r[1], cat: r[2], acct: r[3], name: r[4], grp: groupOf[r[2]] || 'Discretionary' }));
+if (!T.length) { document.querySelector('.charts').innerHTML = '<div class="card wide">No transactions yet. <a href="/import">Import a CSV</a> first.</div>'; return; }
+const minDate = T[0].date, maxDate = T[T.length-1].date;
+
+// ---- filter state (persisted per browser) ----
+const st = Object.assign({ preset:'6', from:'', to:'', flow:'both', neutral:false, gran:'month', q:'', accts:null, groups:null, cats:null },
+  (() => { try { return JSON.parse(localStorage.getItem('bb-charts') || '{}'); } catch { return {}; } })());
+const save = () => { try { const { accts, groups, cats, ...keep } = st; localStorage.setItem('bb-charts', JSON.stringify(keep)); } catch {} }; // selections reset each visit
+
+const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); // local date, never UTC
+function addMonths(isoStr, n) { const d = new Date(isoStr + 'T00:00:00'); d.setMonth(d.getMonth() + n); d.setDate(d.getDate() + 1); return iso(d); }
+function applyPreset(p) {
+  st.preset = p; st.to = maxDate;
+  if (p === 'all') st.from = minDate;
+  else if (p === 'ytd') st.from = maxDate.slice(0,4) + '-01-01';
+  else st.from = addMonths(maxDate, -Number(p));
+  if (st.from < minDate) st.from = minDate;
+}
+if (!st.from || !st.to) applyPreset(st.preset || '6');
+
+// ---- build checkbox lists ----
+function checks(el, items, key, labelOf) {
+  if (!st[key]) st[key] = items.map(i => i.v);
+  el.innerHTML = '';
+  items.forEach(i => {
+    const l = document.createElement('label'), c = document.createElement('input');
+    c.type = 'checkbox'; c.value = i.v; c.checked = st[key].includes(i.v);
+    c.onchange = () => { st[key] = [...el.querySelectorAll('input:checked')].map(x => x.value); update(); };
+    l.append(c, document.createTextNode(' ' + i.t)); el.append(l);
+  });
+}
+const acctItems = API.accounts.map(a => ({ v: a.ID, t: a.Name }));
+const groupItems = API.groups.map(g => ({ v: g, t: g }));
+const catItems = API.categories.map(c => ({ v: c.Name, t: c.Name }));
+// drop saved selections that no longer exist
+st.accts = null; // always start with every account selected
+checks($('accts'), acctItems, 'accts'); checks($('groups'), groupItems, 'groups'); checks($('cats'), catItems, 'cats');
+$('catall').onclick = () => { st.cats = catItems.map(i => i.v); checks($('cats'), catItems, 'cats'); update(); };
+$('catnone').onclick = () => { st.cats = []; checks($('cats'), catItems, 'cats'); update(); };
+
+// ---- other controls ----
+$('presets').onclick = e => { const p = e.target.dataset.p; if (p) { applyPreset(p); update(); } };
+$('flow').onclick = e => { const f = e.target.dataset.f; if (f) { st.flow = f; update(); } };
+$('from').onchange = e => { st.from = e.target.value; st.preset = ''; update(); };
+$('to').onchange = e => { st.to = e.target.value; st.preset = ''; update(); };
+$('neutral').onchange = e => { st.neutral = e.target.checked; update(); };
+$('gran').onchange = e => { st.gran = e.target.value; update(); };
+$('q').oninput = e => { st.q = e.target.value; update(); };
+
+// ---- classification ----
+// kind: income (credits in income categories), neutral (transfers/savings), expense (everything else)
+function kind(t) {
+  if (t.grp === 'Income') return 'income';
+  if (t.grp === 'Neutral' && t.cat !== 'Uncategorized') return 'neutral';
+  return 'expense';
+}
+function merchant(name) {
+  const stop = new Set(['eftpos','purchase','visa','mastercard','debit','card','direct','bpay','osko','payment','pos','tap','contactless','value','date','receipt','paypal','pty','ltd','nsw','vic','qld','wa','sa','tas','act','nt','au','aus','the']);
+  const toks = name.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(t => t.length > 2 && !stop.has(t) && !/\d/.test(t));
+  return toks.slice(0, 2).join(' ') || name.toLowerCase();
+}
+function bucket(date) {
+  if (st.gran === 'month') return date.slice(0, 7);
+  if (st.gran === 'day') return date;
+  const d = new Date(date + 'T00:00:00'); const dow = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dow);
+  return iso(d);
+}
+function allBuckets(from, to) {
+  const out = []; const d = new Date(from + 'T00:00:00'); const end = new Date(to + 'T00:00:00');
+  if (st.gran === 'month') { d.setDate(1); while (d <= end) { out.push(iso(d).slice(0,7)); d.setMonth(d.getMonth() + 1); } }
+  else { if (st.gran === 'week') d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    const step = st.gran === 'week' ? 7 : 1; while (d <= end && out.length < 1500) { out.push(iso(d)); d.setDate(d.getDate() + step); } }
+  return out;
+}
+
+function filtered() {
+  const q = st.q.trim().toLowerCase();
+  return T.filter(t => t.date >= st.from && t.date <= st.to
+    && st.accts.includes(t.acct) && st.groups.includes(t.grp) && st.cats.includes(t.cat)
+    && (!q || t.name.toLowerCase().includes(q))
+    && (st.neutral || kind(t) !== 'neutral'));
+}
+
+// ---- charts ----
+const charts = {};
+function draw(id, config) {
+  if (charts[id]) { charts[id].data = config.data; charts[id].options = config.options; charts[id].update(); return; }
+  charts[id] = new Chart($(id), config);
+}
+const baseOpts = (extra = {}) => Object.assign({ responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+  scales: { y: { ticks: { callback: v => money(v) } } }, plugins: { tooltip: { callbacks: { label: c => (c.dataset.label ? c.dataset.label + ': ' : '') + money(c.parsed.y ?? c.parsed.x ?? c.parsed) } } } }, extra);
+
+function update() {
+  save();
+  // reflect state in controls
+  $('from').value = st.from; $('to').value = st.to; $('neutral').checked = st.neutral; $('gran').value = st.gran; $('q').value = st.q;
+  document.querySelectorAll('#presets button').forEach(b => b.classList.toggle('on', b.dataset.p === st.preset));
+  document.querySelectorAll('#flow button').forEach(b => b.classList.toggle('on', b.dataset.f === st.flow));
+
+  const rows = filtered();
+  const inc = rows.filter(t => kind(t) === 'income' || (kind(t) === 'neutral' && t.amt < 0));
+  const exp = rows.filter(t => kind(t) === 'expense' || (kind(t) === 'neutral' && t.amt >= 0));
+  const incTotal = -inc.reduce((s, t) => s + t.amt, 0), expTotal = exp.reduce((s, t) => s + t.amt, 0);
+  const showInc = st.flow !== 'expense', showExp = st.flow !== 'income';
+  const days = Math.max(1, (new Date(st.to) - new Date(st.from)) / 864e5 + 1), rawM = days / 30.44, months = rawM >= 1.5 ? Math.round(rawM) : Math.max(1, rawM); // whole months, as on the dashboard
+  $('summary').textContent = `${rows.length.toLocaleString()} transactions, ${st.from} to ${st.to}`;
+  $('kpis').innerHTML = [
+    ['Income', incTotal, 'pos'], ['Spending', expTotal, ''], ['Net', incTotal - expTotal, incTotal - expTotal < 0 ? 'neg' : 'pos'],
+    ['Avg income / month', incTotal / months, ''], ['Avg spending / month', expTotal / months, '']
+  ].map(([l, v, c]) => `<div class="kpi"><span>${l}</span><b class="${c}">${money(v)}</b></div>`).join('');
+
+  const labels = allBuckets(st.from, st.to), idx = Object.fromEntries(labels.map((l, i) => [l, i]));
+  const zeros = () => labels.map(() => 0);
+  const incS = zeros(), expS = zeros();
+  inc.forEach(t => { const i = idx[bucket(t.date)]; if (i !== undefined) incS[i] += -t.amt; });
+  exp.forEach(t => { const i = idx[bucket(t.date)]; if (i !== undefined) expS[i] += t.amt; });
+  const net = incS.map((v, i) => v - expS[i]);
+  const ds = [];
+  if (showInc) ds.push({ type: 'bar', label: 'Income', data: incS.map(Math.round), backgroundColor: css('--pos') });
+  if (showExp) ds.push({ type: 'bar', label: 'Spending', data: expS.map(Math.round), backgroundColor: css('--neg') });
+  if (st.flow === 'both') ds.push({ type: 'line', label: 'Net', data: net.map(Math.round), borderColor: css('--acc'), backgroundColor: css('--acc'), tension: .25, pointRadius: 2 });
+  draw('c-flow', { type: 'bar', data: { labels, datasets: ds }, options: baseOpts() });
+
+  // spending by category (stacked over time) — top 9 + Other
+  const byCat = {}; exp.forEach(t => byCat[t.cat] = (byCat[t.cat] || 0) + t.amt);
+  const catsSorted = Object.entries(byCat).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const top = catsSorted.slice(0, 9).map(e => e[0]);
+  const series = {}; top.forEach(c => series[c] = zeros()); series['Other'] = zeros();
+  exp.forEach(t => { const i = idx[bucket(t.date)]; if (i === undefined) return; (series[top.includes(t.cat) ? t.cat : 'Other'])[i] += t.amt; });
+  const stackNames = Object.keys(series).filter(k => series[k].some(v => v));
+  draw('c-stack', { type: 'bar', data: { labels, datasets: stackNames.map((k, i) => ({ type: 'bar', label: k, data: series[k].map(Math.round), backgroundColor: k === 'Other' ? '#94a3b8' : PAL[i % PAL.length] })) },
+    options: baseOpts({ scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => money(v) } } } }) });
+
+  // doughnut: category share
+  const dTop = catsSorted.slice(0, 9), dOther = catsSorted.slice(9).reduce((s, e) => s + e[1], 0);
+  const dl = dTop.map(e => e[0]).concat(dOther > 0 ? ['Other'] : []), dv = dTop.map(e => Math.round(e[1])).concat(dOther > 0 ? [Math.round(dOther)] : []);
+  draw('c-donut', { type: 'doughnut', data: { labels: dl, datasets: [{ data: dv, backgroundColor: dl.map((l, i) => l === 'Other' ? '#94a3b8' : PAL[i % PAL.length]), borderWidth: 1 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' }, tooltip: { callbacks: { label: c => c.label + ': ' + money(c.parsed) + ' (' + Math.round(c.parsed / (dv.reduce((a, b) => a + b, 0) || 1) * 100) + '%)' } } },
+      onClick: (e, els) => { if (els.length && dl[els[0].index] !== 'Other') { st.cats = [dl[els[0].index]]; checks($('cats'), catItems, 'cats'); update(); } } } });
+
+  // by group
+  const byGrp = {}; exp.forEach(t => byGrp[t.grp] = (byGrp[t.grp] || 0) + t.amt);
+  const gl = API.groups.filter(g => byGrp[g] > 0);
+  draw('c-group', { type: 'bar', data: { labels: gl, datasets: [{ label: 'Spending', data: gl.map(g => Math.round(byGrp[g])), backgroundColor: gl.map((g, i) => PAL[i % PAL.length]) }] },
+    options: baseOpts({ indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => money(c.parsed.x) } } }, scales: { x: { ticks: { callback: v => money(v) } } } }) });
+
+  // top merchants
+  const byM = {}; exp.forEach(t => { const m = merchant(t.name); byM[m] = (byM[m] || 0) + t.amt; });
+  const mTop = Object.entries(byM).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  draw('c-merch', { type: 'bar', data: { labels: mTop.map(e => e[0]), datasets: [{ label: 'Spending', data: mTop.map(e => Math.round(e[1])), backgroundColor: css('--acc') }] },
+    options: baseOpts({ indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => money(c.parsed.x) } } }, scales: { x: { ticks: { callback: v => money(v) } } } }) });
+
+  // cumulative net
+  let run = 0; const cum = net.map(v => Math.round(run += v));
+  draw('c-cum', { type: 'line', data: { labels, datasets: [{ label: 'Cumulative net', data: cum, borderColor: css('--acc'), backgroundColor: css('--acc') + '33', fill: true, tension: .2, pointRadius: 0 }] }, options: baseOpts() });
+
+  // day of week
+  const dow = [0,0,0,0,0,0,0]; exp.forEach(t => { const d = (new Date(t.date + 'T00:00:00').getDay() + 6) % 7; dow[d] += t.amt; });
+  draw('c-dow', { type: 'bar', data: { labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], datasets: [{ label: 'Spending', data: dow.map(Math.round), backgroundColor: css('--acc') }] }, options: baseOpts({ plugins: { legend: { display: false } } }) });
+
+  // biggest transactions
+  const big = [...exp].sort((a, b) => b.amt - a.amt).slice(0, 10);
+  const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  $('big').innerHTML = '<tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th></tr>' +
+    big.map(t => `<tr><td>${t.date}</td><td>${esc(t.name)}</td><td>${esc(t.cat)}</td><td class="amt">${money(t.amt)}</td></tr>`).join('');
+}
+update();
+})();
+</script>
+</main>
+</body>
+</html>

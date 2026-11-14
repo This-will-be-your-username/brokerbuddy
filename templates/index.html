@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BrokerBuddy</title>
+{{template "style"}}{{template "navstyle"}}
+</head>
+<body>
+<main>
+{{template "nav" "transactions"}}<div style="display:flex;justify-content:flex-end;gap:8px;align-items:center;margin-bottom:12px">  {{if .Flash}}<span class="flash">{{.Flash}}</span>{{end}}  {{if .PlaidReady}}<button class="primary" id="link-btn">+ Connect a bank</button>{{end}}  <form class="inline" method="post" action="/sync"><button>Sync now</button></form></div>
+
+{{if not .PlaidReady}}<div class="card">Set <code>PLAID_CLIENT_ID</code> and <code>PLAID_SECRET</code> (see README) to enable connecting banks.</div>{{end}}
+
+<div class="grid">
+<div>
+  <div class="card">
+    <form method="get" style="display:flex;gap:8px;flex-wrap:wrap">
+      <input name="q" value="{{.Q}}" placeholder="Search…">
+      <select name="category"><option value="">All categories</option>
+        {{range .Cats}}<option {{if eq . $.Category}}selected{{end}}>{{.}}</option>{{end}}
+      </select>
+      <button>Filter</button>
+    </form>
+  </div>
+  <div class="card scroll">
+    <h2>Transactions</h2>
+    <table>
+      <tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th></tr>
+      {{range .Txns}}
+      <tr>
+        <td>{{.Date}}</td>
+        <td>{{.Name}}<div class="mut">{{.Account}}</div></td>
+        <td>
+          <form class="inline" method="post" action="/txn/category">
+            <input type="hidden" name="id" value="{{.ID}}">
+            <input name="category" value="{{.Category}}" list="cats" size="14" onchange="this.form.submit()" aria-label="Category">
+            <label class="mut"><input type="checkbox" name="make_rule" style="padding:0"> rule</label>
+          </form>
+          {{if .Manual}}<span class="mut" title="Set by you">✎</span>{{end}}{{if eq .Source "learned"}}<span class="mut" title="Matched to a similar transaction you categorised yourself">≈</span>{{end}}{{if eq .Source "lookup"}}<span class="mut" title="Guessed from an online lookup — please check">?</span>{{end}}
+        </td>
+        <td class="amt {{if lt .Amount 0.0}}in{{else}}out{{end}}">{{printf "%.2f" (neg .Amount)}}</td>
+      </tr>
+      {{else}}<tr><td colspan="4" class="mut">No transactions yet. Connect a bank, then Sync.</td></tr>{{end}}
+    </table>
+  </div>
+</div>
+
+<div>
+  <div class="card">
+    <h2>Spending by category</h2>
+    {{range .Totals}}<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between"><span>{{.Category}}</span><span>${{printf "%.2f" .Total}}</span></div><div class="bar" style="width:{{printf "%.0f" (pct .Total $.Max)}}%"></div></div>
+    {{else}}<span class="mut">Nothing to show.</span>{{end}}
+  </div>
+  <div class="card">
+    <h2>Connected banks</h2>
+    {{range .Items}}<div style="margin-bottom:8px"><strong>{{.Institution}}</strong>
+      <form class="inline" method="post" action="/items/delete" onsubmit="return confirm('Disconnect and delete its data?')"><input type="hidden" name="id" value="{{.ID}}"><button>Disconnect</button></form>
+      <div class="mut">{{range .Accounts}}{{.}}{{end}}</div></div>
+    {{else}}<span class="mut">None yet.</span>{{end}}
+    {{if .Manual}}<h2 style="margin-top:12px">Imported accounts</h2>{{range .Manual}}<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>{{.Name}}</span>
+      <form class="inline" method="post" action="/accounts/delete" onsubmit="return confirm('Delete this account and its transactions?')"><input type="hidden" name="id" value="{{.ID}}"><button>Delete</button></form></div>{{end}}{{end}}
+  </div>
+<div class="card">    <h2>Unknown merchants</h2>    <form method="post" action="/lookup" class="inline"><button>Look up unknown merchants</button></form>    <p class="mut">Sends only cleaned business names (like “bunnings”) to Wikipedia, never amounts, dates or accounts. Guesses are marked ? and listed below.</p>    {{range .Lookups}}<div style="display:flex;justify-content:space-between;gap:8px"><span><strong>{{.Key}}</strong> → {{.Category}}<div class="mut">{{.Detail}}</div></span>      <form class="inline" method="post" action="/lookup/delete"><input type="hidden" name="key" value="{{.Key}}"><button aria-label="Reject">×</button></form></div>{{end}}  </div>
+  <div class="card">
+    <h2>Rules</h2>
+    <form method="post" action="/rules" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <input name="pattern" placeholder="contains…" required size="12">
+      <input name="category" list="cats" placeholder="category" required size="12">
+      <button>Add</button>
+    </form>
+    {{range .Rules}}<div style="display:flex;justify-content:space-between"><span>“{{.Pattern}}” → {{.Category}}</span>
+      <form class="inline" method="post" action="/rules/delete"><input type="hidden" name="id" value="{{.ID}}"><button aria-label="Delete rule">×</button></form></div>
+    {{else}}<span class="mut">Your rules override the built-ins.</span>{{end}}
+  </div>
+</div>
+</div>
+<datalist id="cats">{{range .Cats}}<option value="{{.}}">{{end}}</datalist>
+</main>
+
+{{if .PlaidReady}}
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+<script>
+document.getElementById('link-btn').onclick = async () => {
+  const r = await fetch('/link/token', {method:'POST'});
+  if (!r.ok) return alert(await r.text());
+  const {link_token} = await r.json();
+  Plaid.create({
+    token: link_token,
+    onSuccess: async (public_token) => {
+      const x = await fetch('/link/exchange', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({public_token})});
+      if (!x.ok) return alert(await x.text());
+      location.href = '/?msg=Bank connected';
+    },
+  }).open();
+};
+</script>
+{{end}}
+</body>
+</html>

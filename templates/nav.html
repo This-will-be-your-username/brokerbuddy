@@ -1,0 +1,11 @@
+{{define "nav"}}
+<nav class="top" aria-label="Main">
+  <a class="brand" href="/">BrokerBuddy</a>
+  <a href="/" {{if eq . "dashboard"}}aria-current="page"{{end}}>Dashboard</a>
+  <a href="/transactions" {{if eq . "transactions"}}aria-current="page"{{end}}>Transactions</a>
+  <a href="/charts" {{if eq . "charts"}}aria-current="page"{{end}}>Charts</a>
+  <a href="/mortgage" {{if eq . "mortgage"}}aria-current="page"{{end}}>Mortgage</a>
+  <a href="/report" {{if eq . "report"}}aria-current="page"{{end}}>Lender view</a>
+  <a href="/import" {{if eq . "import"}}aria-current="page"{{end}}>Import CSV</a>
+</nav>
+{{end}}
