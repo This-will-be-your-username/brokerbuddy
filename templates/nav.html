@@ -6,6 +6,33 @@
   <a href="/charts" {{if eq . "charts"}}aria-current="page"{{end}}>Charts</a>
   <a href="/mortgage" {{if eq . "mortgage"}}aria-current="page"{{end}}>Mortgage</a>
   <a href="/report" {{if eq . "report"}}aria-current="page"{{end}}>Lender view</a>
-  <a href="/import" {{if eq . "import"}}aria-current="page"{{end}}>Import CSV</a>
+  <a href="/import" {{if eq . "import"}}aria-current="page"{{end}}>Import</a>
+  <div class="right">
+    <div class="seg" role="group" aria-label="Colour theme" id="theme-seg">
+      <button type="button" data-t="auto" aria-pressed="false" title="Follow system setting">Auto</button>
+      <button type="button" data-t="light" aria-pressed="false">Light</button>
+      <button type="button" data-t="dark" aria-pressed="false">Dark</button>
+    </div>
+    <a href="/settings" {{if eq . "settings"}}aria-current="page"{{end}}>Settings</a>
+  </div>
 </nav>
+<script>
+(function () {
+  var seg = document.getElementById('theme-seg'), root = document.documentElement;
+  function current() { try { var t = localStorage.getItem('bb-theme'); return t === 'light' || t === 'dark' ? t : 'auto'; } catch (e) { return 'auto'; } }
+  function paint() { var c = current(); seg.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.t === c)); }); }
+  function apply(t) {
+    try { if (t === 'auto') localStorage.removeItem('bb-theme'); else localStorage.setItem('bb-theme', t); } catch (e) {}
+    if (t === 'auto') delete root.dataset.theme; else root.dataset.theme = t;
+    paint();
+    if (document.querySelector('canvas')) location.reload(); // charts read their colours when drawn
+  }
+  seg.addEventListener('click', function (e) { var t = e.target.dataset && e.target.dataset.t; if (t) apply(t); });
+  // in Auto mode, follow the system when it changes
+  if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+    if (current() === 'auto' && document.querySelector('canvas')) location.reload();
+  });
+  paint();
+})();
+</script>
 {{end}}
