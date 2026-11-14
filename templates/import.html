@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Import CSV · BrokerBuddy</title>
+{{template "style"}}{{template "navstyle"}}
+<style>.err{color:var(--neg)}label.f{display:block;margin:8px 0 2px;color:var(--mut);font-size:13px}.row{display:flex;gap:16px;flex-wrap:wrap}.row>div{min-width:200px}</style>
+</head>
+<body>
+<main>
+{{template "nav" "import"}}
+<header><h1>Import CSV</h1></header>
+{{if .Error}}<div class="card err" role="alert">{{.Error}}</div>{{end}}
+
+{{if eq .Stage "upload"}}
+<div class="card">
+  <p>Export transactions as CSV from your bank and upload it. Columns are detected automatically and you can correct them on the next screen. The file is processed in memory and not kept.</p>
+  <form method="post" action="/import/upload" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".csv,text/csv,.txt" required>
+    <button class="primary">Upload</button>
+  </form>
+</div>
+{{else}}
+<form method="post" action="/import/run">
+<input type="hidden" name="token" value="{{.Token}}">
+<div class="card scroll">
+  <h2>{{.Filename}} — first rows</h2>
+  <table><tr>{{range .Header}}<th>{{.}}</th>{{end}}</tr>
+  {{range .Sample}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}</table>
+</div>
+
+<div class="card">
+  <h2>Column mapping</h2>
+  <div class="row">
+    <div><label class="f" for="date">Date column</label><select id="date" name="date">{{range .DateOpts}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}</select>
+      <label class="f" for="layout">Date format</label><select id="layout" name="layout">{{range .Layouts}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}</select></div>
+    <div><label class="f" for="desc">Description column</label><select id="desc" name="desc">{{range .DescOpts}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}</select>
+      <label class="f" for="desc2">Extra description (optional)</label><select id="desc2" name="desc2">{{range .Desc2Opts}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}</select></div>
+    <div><label class="f" for="category">Bank’s category (optional hint)</label><select id="category" name="category">{{range .CatOpts}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}</select></div>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <div>
+      <label class="f">Amounts</label>
+      <label><input type="radio" name="mode" value="single" {{if not .M.Split}}checked{{end}}> One amount column</label><br>
+      <label><input type="radio" name="mode" value="split" {{if .M.Split}}checked{{end}}> Separate debit / credit columns</label>
+    </div>
+    <div><label class="f" for="amount">Amount column</label><select id="amount" name="amount">{{range .AmountOpts}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}</select>
+      <label style="display:block;margin-top:6px"><input type="checkbox" name="invert" {{if .M.Invert}}checked{{end}}> Positive numbers are money spent</label></div>
+    <div><label class="f" for="debit">Debit (money out)</label><select id="debit" name="debit">{{range .DebitOpts}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}</select>
+      <label class="f" for="credit">Credit (money in)</label><select id="credit" name="credit">{{range .CreditOpts}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}</select></div>
+  </div>
+  <p style="margin-top:12px"><button name="action" value="preview">Update preview</button></p>
+</div>
+
+<div class="card scroll">
+  <h2>Preview ({{.Valid}} of {{.Rows}} rows readable{{if .Skipped}}, {{.Skipped}} skipped{{end}})</h2>
+  <p class="mut">Check that money you spent shows as an outflow (positive) and income as negative/green.</p>
+  <table><tr><th>Date</th><th>Description</th><th>Bank category</th><th style="text-align:right">Shown as</th></tr>
+  {{range .Preview}}<tr><td>{{.Date}}</td><td>{{.Desc}}</td><td class="mut">{{.Cat}}</td>
+    <td class="amt {{if lt .Amount 0.0}}in{{else}}out{{end}}">{{if lt .Amount 0.0}}+{{printf "%.2f" (neg .Amount)}} in{{else}}{{printf "%.2f" .Amount}} out{{end}}</td></tr>
+  {{else}}<tr><td colspan="4" class="mut">Nothing readable yet — adjust the mapping above.</td></tr>{{end}}</table>
+</div>
+
+<div class="card">
+  <h2>Import into</h2>
+  <select name="account" aria-label="Account">
+    {{range .Accounts}}<option value="{{.ID}}" {{if eq .ID $.Acct}}selected{{end}}>{{.Name}}</option>{{end}}
+    <option value="new" {{if not .Acct}}selected{{end}}>＋ New account…</option>
+  </select>
+  <input name="new_name" value="{{.NewName}}" placeholder="New account name, e.g. Everyday Account">
+  <p class="mut">Re-importing overlapping exports is safe: transactions already imported are skipped.</p>
+  <button class="primary" name="action" value="import">Import</button>
+  <a href="/import">Cancel</a>
+</div>
+</form>
+{{end}}
+</main>
+</body>
+</html>
