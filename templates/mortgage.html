@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mortgage · BrokerBuddy</title>
+{{template "style"}}{{template "navstyle"}}
+<style>
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.form label{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--mut)}
+.form input,.form select{font-size:15px;color:var(--fg)}
+.hero{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;margin:2px 0}
+.eq{display:grid;grid-template-columns:1fr auto;gap:2px 16px;max-width:460px;font-variant-numeric:tabular-nums}
+.eq div:nth-child(even){text-align:right}.eq .tot{font-weight:700;border-top:1px solid var(--line);padding-top:4px}
+.warn{color:#b54708;margin:4px 0}@media(prefers-color-scheme:dark){.warn{color:#fdb022}}
+.sl{display:grid;grid-template-columns:minmax(150px,1.1fr) 3fr minmax(150px,1fr);gap:10px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)}
+.sl input[type=range]{width:100%}.sl .v{text-align:right;font-variant-numeric:tabular-nums;font-size:14px}
+@media(max-width:640px){.sl{grid-template-columns:1fr}.sl .v{text-align:left}}
+.sticky{position:sticky;top:0;z-index:5;background:var(--card);border:1px solid var(--acc);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;align-items:baseline}
+.sticky b{font-size:22px;font-variant-numeric:tabular-nums}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}.dim{opacity:.45}
+.small{font-size:13px}
+</style>
+</head>
+<body>
+<main>
+{{template "nav" "mortgage"}}
+{{if .Empty}}<div class="card">No transactions yet, so there is no income or spending to base a borrowing estimate on. <a href="/import">Import a CSV</a> first.</div>{{else}}
+
+<div class="card" role="note">
+  <p style="margin:0">Estimates how much you could borrow from the income and spending found in your transactions
+  (<span id="period"></span>), then the home price that your deposit plus that loan can buy once stamp duty is paid.
+  It's a planning aid, not a lender's decision: banks apply their own minimum living-expense benchmarks, income shading and credit checks.</p>
+</div>
+
+<div class="card">
+  <h2>Your numbers</h2>
+  <div class="form">
+    <label>Deposit / down payment ($)<input id="down" type="number" min="0" step="1000" inputmode="numeric"></label>
+    <label>State / territory<select id="state"></select></label>
+    <label>Buyer type<select id="buyer"><option value="owner">Owner-occupier</option><option value="fhb">First home buyer</option><option value="investor">Investor</option></select></label>
+    <label>Loan term (years)<select id="term"><option>30</option><option>25</option><option>20</option><option>15</option></select></label>
+    <label>Interest rate (% p.a.)<input id="rate" type="number" min="0.5" max="20" step="0.01" inputmode="decimal"></label>
+    <label>Lender stress buffer (%)<input id="buffer" type="number" min="0" max="6" step="0.25"></label>
+    <label>Max loan-to-value (%)<input id="lvr" type="number" min="50" max="98" step="1"></label>
+    <label>Other buying costs ($)<input id="other" type="number" min="0" step="500"></label>
+    <label>Stamp duty override ($, optional)<input id="duty" type="number" min="0" step="100" placeholder="calculated"></label>
+    <label>Share of surplus for repayments (%)<input id="share" type="number" min="10" max="100" step="5"></label>
+    <label>Extra monthly income ($)<input id="extra" type="number" min="0" step="50"></label>
+    <label>Spending history to use<select id="months"><option value="3">3 months</option><option value="6">6 months</option><option value="12">12 months</option></select></label>
+  </div>
+  <p style="margin:10px 0 0"><label><input type="checkbox" id="norent"> My current rent stops when I buy (remove it from spending)</label></p>
+  <p class="mut small" id="rateNote" style="margin:6px 0 0"></p>
+</div>
+
+<div class="card" aria-live="polite">
+  <h2>Result</h2>
+  <div class="mut">Total purchase price you could afford</div>
+  <div class="hero" id="price">—</div>
+  <div id="warnings"></div>
+  <div class="eq" id="eq" style="margin-top:8px"></div>
+  <div class="kpis" style="margin-top:14px" id="kpi"></div>
+  <p class="small mut" id="dutyNote" style="margin-top:12px"></p>
+</div>
+
+<div class="card">
+  <h2>Interest rates on offer</h2>
+  <p class="small mut" id="rateMeta" style="margin-top:0"></p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+    <button type="button" class="primary" id="refresh">Search for current rates</button>
+    <select id="f-purpose" aria-label="Purpose"><option value="OWNER_OCCUPIED">Owner-occupier</option><option value="INVESTMENT">Investment</option></select>
+    <select id="f-repay" aria-label="Repayment type"><option value="PRINCIPAL_AND_INTEREST">Principal &amp; interest</option><option value="INTEREST_ONLY">Interest only</option></select>
+    <select id="f-type" aria-label="Rate type"><option value="">Variable &amp; fixed</option><option value="VARIABLE">Variable</option><option value="FIXED">Fixed</option></select>
+    <input id="f-q" placeholder="Lender or product…" aria-label="Search lenders">
+    <label class="small"><input type="checkbox" id="f-fit" checked> only rates that fit my LVR</label>
+    <label class="small"><input type="checkbox" id="f-all"> include staff / veteran / green-loan and outlier rates</label>
+    <button type="button" id="lowest">Use lowest variable rate</button>
+  </div>
+  <div class="scroll" style="max-height:340px;overflow:auto"><table id="rates"></table></div>
+  <p class="small mut">Source: lenders' own published home-loan rate data under the Consumer Data Right (banks, credit unions and building societies). These are advertised rates; your rate depends on your LVR, profile and negotiation.
+  Mortgage brokers publish no rate feed, but they place loans with these same lenders.</p>
+</div>
+
+<div class="sticky" aria-live="polite">
+  <div><span class="mut small">Purchase price</span><br><b id="sp-price">—</b></div>
+  <div><span class="mut small">vs. current spending</span><br><b id="sp-delta">—</b></div>
+  <div><span class="mut small">Monthly spending</span><br><b id="sp-exp">—</b></div>
+  <div><span class="mut small">Monthly surplus</span><br><b id="sp-sur">—</b></div>
+</div>
+
+<div class="card">
+  <h2>What if you spent differently?</h2>
+  <p class="small mut" style="margin-top:0">Drag a category up or down (1% steps, −100% to +100%). Spending you cut frees money for repayments, so the price you can afford rises.</p>
+  <button type="button" id="resetAll">Reset all sliders</button>
+  <div id="sliders" style="margin-top:8px"></div>
+</div>
+{{end}}
+<script>
+const BOOT = {{.Boot}};
+</script>
+<script>
+(function () {
+if (!BOOT || !BOOT.lines) return;
+const $ = id => document.getElementById(id);
+const money = v => (v < 0 ? '-$' : '$') + Math.abs(Math.round(v)).toLocaleString();
+const defaults = { down: 100000, state: 'NSW', buyer: 'owner', term: '30', rate: 6.2, buffer: 3, lvr: 90, other: 3000, duty: '', share: 100, extra: 0, months: String(BOOT.months || 6), norent: true };
+let S = Object.assign({}, defaults, (() => { try { return JSON.parse(localStorage.getItem('bb-mortgage') || '{}'); } catch { return {}; } })());
+const adjust = {}; // category -> percent
+let rateLabel = '';
+
+$('period').textContent = (BOOT.from && BOOT.to) ? BOOT.from + ' to ' + BOOT.to : 'your history';
+BOOT.states.forEach(s => { const o = document.createElement('option'); o.value = s.Code; o.textContent = s.Name; $('state').append(o); });
+const bind = (id, key, num) => { const e = $(id); if (e.type === 'checkbox') e.checked = !!S[key]; else e.value = S[key];
+  e.addEventListener('input', () => { S[key] = e.type === 'checkbox' ? e.checked : e.value; if (id === 'rate') { rateLabel = ''; } persist(); calc(); }); };
+const persist = () => { try { localStorage.setItem('bb-mortgage', JSON.stringify(S)); } catch {} };
+[['down','down'],['state','state'],['buyer','buyer'],['term','term'],['rate','rate'],['buffer','buffer'],['lvr','lvr'],['other','other'],['duty','duty'],['share','share'],['extra','extra'],['months','months'],['norent','norent']].forEach(([i,k]) => bind(i,k));
+$('months').addEventListener('change', () => { location.href = '/mortgage?months=' + S.months; });
+if (String(BOOT.months) !== String(S.months)) { S.months = String(BOOT.months); $('months').value = S.months; }
+
+function payload(adj) {
+  return { down: +S.down || 0, state: S.state, buyer: S.buyer, termYears: +S.term, ratePct: +S.rate || 0, bufferPct: +S.buffer || 0,
+    maxLvrPct: +S.lvr || 90, otherCosts: +S.other || 0, dutyOverride: S.duty === '' ? null : +S.duty, sharePct: +S.share || 100,
+    excludeRent: !!S.norent, months: +S.months, adjust: adj, extraIncome: +S.extra || 0 };
+}
+const post = body => fetch('/api/mortgage/calc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
+
+let timer = 0, seq = 0, last = null;
+function calc() { clearTimeout(timer); timer = setTimeout(run, 60); }
+async function run() {
+  const my = ++seq;
+  const [cur, base] = await Promise.all([post(payload(adjust)), post(payload({}))]);
+  if (my !== seq) return; // a newer request superseded this one
+  last = cur; render(cur, base);
+}
+
+function row(label, val, cls) { return `<div class="${cls || ''}">${label}</div><div class="${cls || ''}">${val}</div>`; }
+function render(o, base) {
+  $('price').textContent = o.price > 0 ? money(o.price) : 'Not enough to buy yet';
+  $('eq').innerHTML =
+    row('Your deposit', money(o.down)) + row('+ Maximum loan', money(o.loan)) + row('= Total funds', money(o.down + o.loan), 'tot') +
+    row('− Stamp duty', money(o.duty)) + row('− Other buying costs', money(o.otherCosts)) + row('= Purchase price', money(o.price), 'tot');
+  $('kpi').innerHTML = [
+    ['Monthly income', money(o.incomeM)], ['Monthly spending', money(o.expensesM)], ['Surplus', money(o.surplusM)],
+    ['Repayment at ' + (+S.rate).toFixed(2) + '%', money(o.repaymentM) + '/mo'],
+    ['Assessed at ' + o.assessRatePct.toFixed(2) + '%', money(o.assessPaymentM) + '/mo'],
+    ['Loan-to-value', o.lvrPct.toFixed(0) + '%'],
+    ['Limited by', { serviceability: 'Repayment capacity', lvr: 'Max LVR', deposit: 'Deposit' }[o.binding]]
+  ].map(([l, v]) => `<div class="kpi"><span>${l}</span><b style="font-size:18px">${v}</b></div>`).join('');
+  $('warnings').innerHTML = (o.warnings || []).map(w => `<div class="warn">⚠ ${w.replace(/</g,'&lt;')}</div>`).join('');
+  const st = BOOT.states.find(s => s.Code === S.state);
+  $('dutyNote').innerHTML = (S.duty !== '' ? 'Using your own stamp duty figure. ' : '') +
+    (st ? `<strong>${st.Name} duty:</strong> ${st.Status.replace(/</g,'&lt;')} <a href="${st.URL}" target="_blank" rel="noopener noreferrer">Official calculator ↗</a>` : '');
+  $('rateNote').textContent = (rateLabel ? 'Rate from: ' + rateLabel + '. ' : '') + 'Repayments are assessed at your rate plus the buffer (lenders typically add 3 points).';
+
+  // sticky summary
+  $('sp-price').textContent = o.price > 0 ? money(o.price) : '—';
+  const d = o.price - base.price;
+  $('sp-delta').textContent = (d >= 0 ? '+' : '−') + money(Math.abs(d)).replace('-', '');
+  $('sp-delta').style.color = d > 0 ? 'var(--pos)' : d < 0 ? 'var(--neg)' : '';
+  $('sp-exp').textContent = money(o.expensesM);
+  $('sp-sur').textContent = money(o.surplusM);
+  updateSliderLabels(o);
+  if (rateRows.length) renderRates();
+}
+
+// ---- sliders ----
+const slHost = $('sliders'), slRefs = {};
+BOOT.lines.forEach(l => {
+  if (l.monthly < 1) return;
+  const w = document.createElement('div'); w.className = 'sl';
+  const name = document.createElement('label'); name.textContent = l.category; name.htmlFor = 'sl-' + l.category;
+  const g = document.createElement('div'); g.className = 'mut small'; g.textContent = l.group; name.append(document.createElement('br'), g);
+  const r = document.createElement('input'); r.type = 'range'; r.min = -100; r.max = 100; r.step = 1; r.value = 0; r.id = 'sl-' + l.category;
+  r.setAttribute('aria-label', l.category + ' spending change in percent');
+  const v = document.createElement('div'); v.className = 'v';
+  r.addEventListener('input', () => { adjust[l.category] = +r.value; if (!+r.value) delete adjust[l.category]; calc(); });
+  r.addEventListener('dblclick', () => { r.value = 0; delete adjust[l.category]; calc(); });
+  w.append(name, r, v); slHost.append(w); slRefs[l.category] = { r, v, base: l.monthly };
+});
+function updateSliderLabels(o) {
+  Object.entries(slRefs).forEach(([c, x]) => {
+    const p = +x.r.value, adj = o.adjusted[c] ?? x.base;
+    const off = c === 'Rent' && S.norent;
+    x.r.disabled = off; x.v.parentElement.classList.toggle('dim', off);
+    x.v.innerHTML = off ? 'removed (renting ends)' : `<b>${p > 0 ? '+' : ''}${p}%</b> · ${money(x.base)} → ${money(adj)}/mo`;
+  });
+}
+$('resetAll').onclick = () => { Object.keys(adjust).forEach(k => delete adjust[k]); Object.values(slRefs).forEach(x => x.r.value = 0); calc(); };
+
+// ---- rates ----
+let rateRows = [], shown = 60;
+const typeLabel = r => r.type === 'FIXED' ? 'Fixed' + (r.fixedMonths ? ' ' + (r.fixedMonths % 12 ? r.fixedMonths + 'mo' : (r.fixedMonths / 12) + 'yr') : '') : 'Variable';
+function lvrRange(r) { const n = v => v == null ? null : (v <= 1 ? v * 100 : v); return [n(r.lvrMin), n(r.lvrMax)]; }
+function fits(r) { if (!last) return true; const [lo, hi] = lvrRange(r); return !((hi != null && last.lvrPct > hi + 0.01) || (lo != null && last.lvrPct < lo - 0.01)); }
+function renderRates() {
+  const tbl = $('rates'), onlyFit = $('f-fit').checked;
+  const rows = rateRows.filter(r => !onlyFit || fits(r));
+  const head = '<tr><th>Lender</th><th>Product</th><th>Type</th><th class="n">Rate</th><th class="n">Comparison</th><th>LVR</th><th></th></tr>';
+  tbl.innerHTML = head;
+  rows.slice(0, shown).forEach(r => {
+    const tr = document.createElement('tr'); const [lo, hi] = lvrRange(r);
+    const cells = [r.brand, r.product, typeLabel(r), r.rate.toFixed(2) + '%', r.comparison ? r.comparison.toFixed(2) + '%' : '—', (lo == null && hi == null) ? '—' : `${lo ?? 0}–${hi ?? '∞'}%`];
+    cells.forEach((c, i) => { const td = document.createElement('td'); td.textContent = c; if (i === 3 || i === 4) td.className = 'n'; tr.append(td); });
+    const td = document.createElement('td'); const b = document.createElement('button'); b.type = 'button'; b.textContent = 'Use';
+    b.onclick = () => { S.rate = r.rate.toFixed(2); $('rate').value = S.rate; rateLabel = r.brand + ' – ' + r.product + ' (' + typeLabel(r) + ')'; persist(); calc(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    td.append(b); tr.append(td); tbl.append(tr);
+  });
+  if (rows.length > shown) { const tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = 7;
+    const b = document.createElement('button'); b.textContent = `Show more (${rows.length - shown} more)`; b.onclick = () => { shown += 100; renderRates(); }; td.append(b); tr.append(td); tbl.append(tr); }
+  if (!rows.length) tbl.innerHTML += '<tr><td colspan="7" class="mut">No rates cached yet. Click “Search for current rates”.</td></tr>';
+}
+async function loadRates() {
+  const qs = new URLSearchParams({ purpose: $('f-purpose').value, repayment: $('f-repay').value, type: $('f-type').value, q: $('f-q').value, all: $('f-all').checked ? '1' : '0' });
+  rateRows = await (await fetch('/api/mortgage/rates?' + qs)).json(); shown = 60; renderRates();
+}
+['f-purpose','f-repay','f-type','f-all'].forEach(i => $(i).addEventListener('change', loadRates));
+$('f-q').addEventListener('input', () => { clearTimeout($('f-q')._t); $('f-q')._t = setTimeout(loadRates, 250); });
+$('f-fit').addEventListener('change', renderRates);
+$('lowest').onclick = async () => {
+  const qs = new URLSearchParams({ purpose: $('f-purpose').value, repayment: $('f-repay').value, type: 'VARIABLE' });
+  const rows = (await (await fetch('/api/mortgage/rates?' + qs)).json()).filter(fits);
+  if (!rows.length) return alert('No cached variable rates yet — click “Search for current rates” first.');
+  const r = rows[0]; S.rate = r.rate.toFixed(2); $('rate').value = S.rate; rateLabel = r.brand + ' – ' + r.product + ' (Variable)'; persist(); calc();
+};
+async function status() {
+  const s = await (await fetch('/api/mortgage/rates/status')).json();
+  const meta = $('rateMeta');
+  if (s.running) { meta.textContent = `Searching… ${s.done}/${s.total} lenders checked, ${s.rows.toLocaleString()} rates found${s.failed ? ' (' + s.failed + ' unreachable)' : ''}.`; $('refresh').disabled = true; setTimeout(status, 1200); return; }
+  $('refresh').disabled = false;
+  if (s.error) meta.textContent = 'Rate search failed: ' + s.error;
+  else if (s.cached) { meta.textContent = `${s.cached.toLocaleString()} rates from ${s.lenders} lenders, fetched ${new Date(s.fetched).toLocaleString()}` + (s.failed ? ` · ${s.failed} lenders couldn't be reached` : '') + '.'; }
+  else meta.textContent = 'No rates downloaded yet. Click “Search for current rates” (takes about a minute).';
+  loadRates();
+}
+$('refresh').onclick = async () => { await fetch('/api/mortgage/rates/refresh', { method: 'POST' }); status(); };
+
+status(); run();
+})();
+</script>
+</main>
+</body>
+</html>
