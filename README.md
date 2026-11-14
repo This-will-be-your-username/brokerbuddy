@@ -1,29 +1,34 @@
 # BrokerBuddy
 
-Local Go web app: connect bank accounts via [Plaid](https://plaid.com), pull transactions, auto-categorize them.
+A private, self-hosted money dashboard. Import bank CSVs (or link a bank through Plaid), have transactions sorted into lender-style categories, see income and spending, and estimate how much you could borrow for a home.
 
 ## Run
 
-1. Get free Sandbox keys at https://dashboard.plaid.com (Developers → Keys).
-2. Start the app (PowerShell):
-
-```powershell
-$env:PLAID_CLIENT_ID="..."; $env:PLAID_SECRET="..."; $env:PLAID_ENV="sandbox"
-$env:APP_SECRET="long-random-string"   # encrypts bank tokens in the DB; keep it stable
+```
 go run .
 ```
 
-3. Open https://127.0.0.1:8443 (self-signed cert, so accept the browser warning once), click **Connect a bank**. In Sandbox use `user_good` / `pass_good`.
+Open **https://127.0.0.1:8443** (the certificate is self-signed, so accept the browser warning once; it is generated once and kept, so you won't be asked again). Then go to **Settings**.
 
-`PLAID_ENV` can be `sandbox` or `production` (production needs Plaid approval). Other vars: `ADDR`, `DB_PATH`.
+**Everything is configured in the web interface.** There are no environment variables. The only startup options are optional flags:
 
-## HTTPS
+| Flag | Default | Meaning |
+|------|---------|---------|
+| `-db` | `brokerbuddy.db` | where your data lives |
+| `-addr` | `127.0.0.1:8443` | local address for the web UI |
 
-- **Local (default):** in-memory self-signed cert on `127.0.0.1:8443`.
-- **Let's Encrypt:** point a DNS record at the machine, open ports 80 and 443, then set `DOMAIN=bank.example.com`, `APP_PASSWORD=...` (HTTP basic auth, user `admin` or `APP_USER`) and optionally `ACME_EMAIL`. Certs are fetched and renewed automatically and cached in `CERT_DIR` (default `certs/`). Set `ACME_STAGING=1` first to avoid rate limits.
-- **Your own cert:** `TLS_CERT` and `TLS_KEY` file paths; `ADDR` to change the bind address.
+On first run an encryption key is generated next to the database (`brokerbuddy.db.key`). **Back up both files together**; without the key file, stored secrets (bank tokens, Plaid secret) can't be read.
 
-A non-loopback `ADDR` or `DOMAIN` refuses to start without `APP_PASSWORD`.
+## Settings
+
+- **Banks:** optional Plaid keys (secret stored encrypted, never shown again), connected and imported accounts.
+- **Categorisation:** rules, merchant lookups, re-run categorisation.
+- **Security:** set a password. With no password the app answers only on this computer (it refuses other host names, which also blocks DNS-rebinding). Passwords are bcrypt-hashed, sign-in is rate limited, and cross-site form posts are rejected.
+- **Access & HTTPS:** choose *This computer only*, *Internet with a free Let's Encrypt certificate* (needs a domain and open ports 80/443), or *your own certificate*. Changes apply immediately without a restart, and the local address always stays available so a wrong setting can't lock you out. Anything beyond this computer requires a password.
+
+## Appearance
+
+Use the **Auto / Light / Dark** control in the top bar. Auto follows your system setting. The choice is remembered per browser.
 
 ## CSV import (no bank API needed)
 
@@ -35,19 +40,19 @@ Transactions are bucketed into ~30 categories grouped the way an Australian lend
 
 Classification order: your rules, then a built-in dictionary of AU merchants and bank phrases (longest phrase wins, whole words only, direction-aware so a salary credit is income but a debit is not), then cached online lookups, then the bank's own category.
 
-**Learning from your edits:** every category you set by hand becomes an example. Similar transactions (same business name, ignoring store numbers and suburbs, tolerating typos like `ZORBA`/`ZORBAS`) follow automatically and are marked `≈`. An example that fully matches beats the built-in dictionary; a brand-only match (e.g. you categorised `COLES EXPRESS`, a new one says `COLES`) is used only where the dictionary has no answer, and is skipped if your examples for that brand disagree. Your explicit rules still win over everything, and a debit is never learned as income.
+**Learning from your edits:** every category you set by hand becomes an example. Similar transactions (same business name, ignoring store numbers and suburbs, tolerating typos like `ZORBA`/`ZORBAS`) follow automatically and are marked *learned*. An example that fully matches beats the built-in dictionary; a brand-only match (e.g. you categorised `COLES EXPRESS`, a new one says `COLES`) is used only where the dictionary has no answer, and is skipped if your examples for that brand disagree. Your explicit rules still win over everything, and a debit is never learned as income.
 
-**Unknown merchants:** click *Look up unknown merchants*. It sends only cleaned business names (e.g. `bunnings`) to Wikipedia's free API, 12 per click, biggest spend first. Results are marked `?`, listed on the home page, and can be rejected. Wikipedia knows chains, not local shops: for those, set the category once and tick *rule*.
+**Unknown merchants:** click *Look up unknown merchants*. It sends only cleaned business names (e.g. `bunnings`) to Wikipedia's free API, 12 per click, biggest spend first. Results are marked *lookup* on the Transactions tab, listed under Settings → Categorisation, and can be rejected. Wikipedia knows chains, not local shops: for those, set the category once and tick *rule*.
 
 **Lender view** (`/report`): 3/6/12-month averages by group and category, % of income, surplus, and a list of things an assessor may notice. CSV download included. It is a preparation aid, not a serviceability calculation.
 
 ## Tabs
 
 - **Dashboard** (`/`): income, spending, surplus and savings rate for 1/3/6/12 months or all time, monthly income-vs-expenses chart, top spending categories, recent transactions.
-- **Transactions** (`/transactions`): the full list, inline category editing, rules, imported accounts, merchant lookups.
+- **Transactions** (`/transactions`): the full list with search, category filter and inline category editing.
 - **Charts** (`/charts`): filter by period, accounts, groups, categories, income/spending, search text, and day/week/month grouping. Seven views: income vs spending, stacked spending by category, category share (click a slice to filter), group split, top merchants, cumulative net, spending by weekday, plus the largest transactions. Filtering happens in the browser, so it is instant.
 - **Mortgage** (`/mortgage`): see below.
-- **Lender view** (`/report`) and **Import CSV** (`/import`).
+- **Lender view** (`/report`), **Import** (`/import`) and **Settings** (`/settings`).
 
 ## Mortgage tab
 
@@ -66,13 +71,13 @@ Classification order: your rules, then a built-in dictionary of AU merchants and
 
 - Plaid Link (browser) → public token → server exchanges for an access token, stored AES-GCM encrypted in SQLite.
 - `/transactions/sync` (cursor-based) pulls added/modified/removed transactions atomically.
-- Categorization priority: your rules → built-in keywords → Plaid's category → Uncategorized.
-- Edit a category inline; tick "rule" to learn from it. Manual edits survive re-syncs.
+- Categorisation priority is described above; manual edits survive re-syncs.
 
 ## Security notes
 
-- Single-user. Loopback needs no login; any public mode requires `APP_PASSWORD`. Cross-origin POSTs are rejected.
-- Losing `APP_SECRET` makes stored tokens unreadable (reconnect banks).
+- Single-user app. See Settings → Security above for how access is controlled.
+- Secrets in the database (bank access tokens, Plaid secret, private keys) are AES-GCM encrypted with the key file.
+- Rate and merchant lookups send no personal data: only public rate requests, and cleaned business names for lookups you trigger.
 
 ## Test
 
