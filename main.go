@@ -4,13 +4,14 @@ import (
 	"database/sql"
 	"embed"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
+	"sync/atomic"
 )
 
 //go:embed static
@@ -20,43 +21,56 @@ var staticFS embed.FS
 var tplFS embed.FS
 
 type app struct {
-	db    *sql.DB
-	plaid *plaidClient
-	vault *vault
-	tpl   *template.Template
+	db      *sql.DB
+	plaid   atomic.Pointer[plaidClient] // replaced live when Plaid settings change
+	vault   *vault
+	tpl     *template.Template
+	dbPath  string
+	keyPath string
+	net     *netManager
+	sess    *sessionStore
+	limiter *loginLimiter
 }
 
-func env(k, def string) string {
-	if v := os.Getenv(k); v != "" {
-		return v
-	}
-	return def
-}
+// pc returns the Plaid client, or nil when Plaid isn't configured.
+func (a *app) pc() *plaidClient { return a.plaid.Load() }
 
 func main() {
-	db, err := openDB(env("DB_PATH", "brokerbuddy.db"))
+	// The only startup options. Everything else is configured in the web interface (Settings).
+	dbPath := flag.String("db", "brokerbuddy.db", "path to the SQLite database file")
+	addr := flag.String("addr", "127.0.0.1:8443", "local address for the web interface")
+	flag.Parse()
+
+	a, err := newApp(*dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	secret := os.Getenv("APP_SECRET")
-	if secret == "" {
-		log.Fatal("APP_SECRET is required (any long random string; encrypts bank tokens at rest)")
+	a.net = newNetManager(a, a.routes(), *addr)
+	a.net.Start()
+	log.Printf("BrokerBuddy is running: open https://%s in your browser (configure everything under Settings)", *addr)
+	select {}
+}
+
+func newApp(dbPath string) (*app, error) {
+	db, err := openDB(dbPath)
+	if err != nil {
+		return nil, err
 	}
+	keyPath := dbPath + ".key"
+	key, err := loadOrCreateKey(keyPath)
+	if err != nil {
+		return nil, err
+	}
+	v, err := newVault(key)
+	if err != nil {
+		return nil, err
+	}
+	a := &app{db: db, vault: v, tpl: parseTemplates(), dbPath: dbPath, keyPath: keyPath, sess: newSessionStore(), limiter: newLoginLimiter()}
+	a.reloadPlaid()
 	if err := recategorizeAll(db); err != nil { // move existing data onto the current category set
 		log.Println("recategorize:", err)
 	}
-	v, err := newVault(secret)
-	if err != nil {
-		log.Fatal(err)
-	}
-	a := &app{db: db, vault: v, tpl: parseTemplates()}
-	if id, sec := os.Getenv("PLAID_CLIENT_ID"), os.Getenv("PLAID_SECRET"); id != "" && sec != "" {
-		a.plaid = newPlaid(env("PLAID_ENV", "sandbox"), id, sec)
-	} else {
-		log.Println("PLAID_CLIENT_ID / PLAID_SECRET not set: bank linking disabled")
-	}
-
-	serve(sameOrigin(a.routes()))
+	return a, nil
 }
 
 func parseTemplates() *template.Template {
@@ -100,8 +114,17 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("POST /import/upload", a.importUpload)
 	mux.HandleFunc("POST /import/run", a.importRun)
 	mux.HandleFunc("POST /accounts/delete", a.deleteAccount)
+	// settings & sign-in
+	mux.HandleFunc("GET /settings", a.settingsPage)
+	mux.HandleFunc("POST /settings/plaid", a.savePlaid)
+	mux.HandleFunc("POST /settings/password", a.savePassword)
+	mux.HandleFunc("POST /settings/password/remove", a.removePassword)
+	mux.HandleFunc("POST /settings/network", a.saveNetwork)
+	mux.HandleFunc("GET /login", a.loginPage)
+	mux.HandleFunc("POST /login", a.loginSubmit)
+	mux.HandleFunc("POST /logout", a.logout)
 
-	return mux
+	return secureHeaders(sameOrigin(a.auth(mux)))
 }
 
 // sameOrigin is CSRF protection for state-changing requests.
@@ -186,37 +209,11 @@ func (a *app) index(w http.ResponseWriter, r *http.Request) {
 		rows.Close()
 	}
 
-	var items []itemView
-	rows, err = a.db.Query(`SELECT i.id,i.institution,COALESCE(group_concat(a.name||CASE WHEN a.mask<>'' THEN ' ••'||a.mask ELSE '' END,', '),'') FROM items i
-		LEFT JOIN accounts a ON a.item_id=i.id GROUP BY i.id`)
-	if err == nil {
-		for rows.Next() {
-			var iv itemView
-			var accts string
-			rows.Scan(&iv.ID, &iv.Institution, &accts)
-			iv.Accounts = []string{accts}
-			items = append(items, iv)
-		}
-		rows.Close()
-	}
-
-	var rules []ruleView
-	rows, err = a.db.Query(`SELECT id,pattern,category FROM rules ORDER BY id DESC`)
-	if err == nil {
-		for rows.Next() {
-			var rv ruleView
-			rows.Scan(&rv.ID, &rv.Pattern, &rv.Category)
-			rules = append(rules, rv)
-		}
-		rows.Close()
-	}
-
 	catList := allCategories()
 
 	a.tpl.ExecuteTemplate(w, "index.html", map[string]any{
-		"Txns": txns, "Totals": totals, "Items": items, "Rules": rules, "Cats": catList,
-		"Max": maxTotal(totals), "Category": cat, "Q": search, "PlaidReady": a.plaid != nil,
-		"Flash": q.Get("msg"), "Manual": a.manualAccounts(), "Lookups": a.lookupList(),
+		"Txns": txns, "Totals": totals, "Cats": catList, "Max": maxTotal(totals),
+		"Category": cat, "Q": search, "PlaidReady": a.pc() != nil, "Flash": q.Get("msg"),
 	})
 }
 
@@ -229,11 +226,11 @@ func sortStrings(s []string) {
 }
 
 func (a *app) linkToken(w http.ResponseWriter, r *http.Request) {
-	if a.plaid == nil {
+	if a.pc() == nil {
 		fail(w, errNoPlaid, 503)
 		return
 	}
-	t, err := a.plaid.linkToken()
+	t, err := a.pc().linkToken()
 	if err != nil {
 		fail(w, err, 502)
 		return
@@ -242,7 +239,7 @@ func (a *app) linkToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) linkExchange(w http.ResponseWriter, r *http.Request) {
-	if a.plaid == nil {
+	if a.pc() == nil {
 		fail(w, errNoPlaid, 503)
 		return
 	}
@@ -253,7 +250,7 @@ func (a *app) linkExchange(w http.ResponseWriter, r *http.Request) {
 		fail(w, errBad, 400)
 		return
 	}
-	ex, err := a.plaid.exchange(in.PublicToken)
+	ex, err := a.pc().exchange(in.PublicToken)
 	if err != nil {
 		fail(w, err, 502)
 		return
@@ -265,7 +262,7 @@ func (a *app) linkExchange(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := a.db.Exec(`INSERT INTO items(plaid_item_id,access_token,institution) VALUES(?,?,?)
 		ON CONFLICT(plaid_item_id) DO UPDATE SET access_token=excluded.access_token`,
-		ex.ItemID, enc, a.plaid.institution(ex.AccessToken))
+		ex.ItemID, enc, a.pc().institution(ex.AccessToken))
 	if err != nil {
 		fail(w, err, 500)
 		return
@@ -356,26 +353,26 @@ func (a *app) addRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	recategorizeAll(a.db)
-	http.Redirect(w, r, "/transactions", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings#categorisation", http.StatusSeeOther)
 }
 
 func (a *app) deleteRule(w http.ResponseWriter, r *http.Request) {
 	a.db.Exec(`DELETE FROM rules WHERE id=?`, r.FormValue("id"))
 	recategorizeAll(a.db)
-	http.Redirect(w, r, "/transactions", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings#categorisation", http.StatusSeeOther)
 }
 
 func (a *app) deleteItem(w http.ResponseWriter, r *http.Request) {
 	var enc string
-	if err := a.db.QueryRow(`SELECT access_token FROM items WHERE id=?`, r.FormValue("id")).Scan(&enc); err == nil && a.plaid != nil {
+	if err := a.db.QueryRow(`SELECT access_token FROM items WHERE id=?`, r.FormValue("id")).Scan(&enc); err == nil && a.pc() != nil {
 		if tok, err := a.vault.open(enc); err == nil {
-			if err := a.plaid.remove(tok); err != nil {
+			if err := a.pc().remove(tok); err != nil {
 				log.Println("plaid remove:", err)
 			}
 		}
 	}
 	a.db.Exec(`DELETE FROM items WHERE id=?`, r.FormValue("id"))
-	http.Redirect(w, r, "/transactions", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings#banks", http.StatusSeeOther)
 }
 
 func maxTotal(t []catTotal) float64 {

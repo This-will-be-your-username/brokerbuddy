@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Settings · BrokerBuddy</title>
+{{template "style"}}
+<style>
+.sections{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.sections a{padding:4px 12px;border:1px solid var(--line);border-radius:999px;color:var(--mut);background:var(--card)}
+.sections a:hover{color:var(--fg);text-decoration:none;background:var(--soft)}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:12px;cursor:pointer}
+.opt:has(input:checked){border-color:var(--acc);background:var(--soft)}
+.opt input{margin-top:4px}
+.sub{margin:10px 0 0 28px}
+section.card{scroll-margin-top:12px}
+.list>div{display:flex;justify-content:space-between;gap:4px 12px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--line)}
+.list>div:last-child{border-bottom:0}
+.ok::before{content:"●";color:var(--pos);margin-right:6px}.bad::before{content:"●";color:var(--neg);margin-right:6px}
+</style>
+</head>
+<body>
+<main>
+{{template "nav" "settings"}}
+<header><h1>Settings</h1>
+  {{if .HasPassword}}<form class="inline" method="post" action="/logout"><button>Sign out</button></form>{{end}}
+</header>
+{{if .Flash}}<div class="card flash" role="status">{{.Flash}}</div>{{end}}
+{{if .Error}}<div class="card neg" role="alert">{{.Error}}</div>{{end}}
+<div class="sections"><a href="#banks">Banks</a><a href="#categorisation">Categorisation</a><a href="#security">Security</a><a href="#access">Access &amp; HTTPS</a><a href="#about">About</a></div>
+
+<section class="card" id="banks">
+  <h2>Bank connection (Plaid)</h2>
+  <p class="mut small">Optional. Plaid links banks in the US, Canada and Europe; it doesn't cover Australian banks, so use <a href="/import">Import</a> for those. Get keys at <a href="https://dashboard.plaid.com" target="_blank" rel="noopener noreferrer">dashboard.plaid.com</a> (Sandbox is free). Your secret is stored encrypted and never shown again.</p>
+  <form method="post" action="/settings/plaid" class="stack">
+    <div class="fields">
+      <label class="f">Client ID<input name="client_id" value="{{.PlaidClientID}}" autocomplete="off" spellcheck="false"></label>
+      <label class="f">Secret<input name="secret" type="password" autocomplete="new-password" placeholder="{{if .PlaidSecretSet}}•••••••• saved (leave blank to keep){{else}}paste your secret{{end}}"></label>
+      <label class="f">Environment<select name="env"><option value="sandbox" {{if eq .PlaidEnv "sandbox"}}selected{{end}}>Sandbox (test data)</option><option value="production" {{if eq .PlaidEnv "production"}}selected{{end}}>Production</option></select></label>
+    </div>
+    <div class="row">
+      <button class="primary">Save &amp; test</button>
+      {{if .PlaidSecretSet}}<label class="small mut"><input type="checkbox" name="remove"> Remove saved credentials</label>{{end}}
+      {{if .PlaidReady}}<span class="ok small">Connected</span>{{end}}
+    </div>
+  </form>
+
+  <h2 style="margin-top:22px">Accounts</h2>
+  <div class="list">
+    {{range .Items}}<div><span><strong>{{.Institution}}</strong> <span class="pill">linked</span><div class="mut small">{{range .Accounts}}{{.}}{{end}}</div></span>
+      <form class="inline" method="post" action="/items/delete" onsubmit="return confirm('Disconnect this bank and delete its transactions?')"><input type="hidden" name="id" value="{{.ID}}"><button class="danger">Disconnect</button></form></div>{{end}}
+    {{range .Manual}}<div><span><strong>{{.Name}}</strong> <span class="pill">imported</span></span>
+      <form class="inline" method="post" action="/accounts/delete" onsubmit="return confirm('Delete this account and all its transactions?')"><input type="hidden" name="id" value="{{.ID}}"><button class="danger">Delete</button></form></div>{{end}}
+    {{if not (or .Items .Manual)}}<div class="mut">No accounts yet. <a href="/import">Import a CSV</a> to add one.</div>{{end}}
+  </div>
+</section>
+
+<section class="card" id="categorisation">
+  <h2>Categorisation</h2>
+  <p class="mut small">Your rules always win. Changing a category on the Transactions page also teaches the app, so similar transactions follow.</p>
+  <form method="post" action="/rules" class="row" style="margin-bottom:8px">
+    <input name="pattern" placeholder="Description contains…" required aria-label="Pattern">
+    <select name="category" required aria-label="Category">{{range .Cats}}<option>{{.}}</option>{{end}}</select>
+    <button class="primary">Add rule</button>
+  </form>
+  <div class="list">
+    {{range .Rules}}<div><span>“{{.Pattern}}” → <strong>{{.Category}}</strong></span>
+      <form class="inline" method="post" action="/rules/delete"><input type="hidden" name="id" value="{{.ID}}"><button aria-label="Delete rule">Remove</button></form></div>
+    {{else}}<div class="mut">No rules yet.</div>{{end}}
+  </div>
+
+  <h2 style="margin-top:22px">Unknown merchants</h2>
+  <p class="mut small">Looks up businesses the built-in list doesn't know on Wikipedia, 12 at a time. Only the cleaned business name (e.g. “bunnings”) is sent, never amounts, dates or accounts. Results are marked <span class="pill">lookup</span> on Transactions; reject any that are wrong.</p>
+  <div class="row"><form class="inline" method="post" action="/lookup"><button>Look up unknown merchants</button></form>
+  <form class="inline" method="post" action="/recategorize"><button>Re-run categorisation</button></form></div>
+  <div class="list" style="margin-top:8px">
+    {{range .Lookups}}<div><span><strong>{{.Key}}</strong> → {{.Category}}<div class="mut small">{{.Detail}}</div></span>
+      <form class="inline" method="post" action="/lookup/delete"><input type="hidden" name="key" value="{{.Key}}"><button aria-label="Reject">Reject</button></form></div>{{end}}
+  </div>
+</section>
+
+<section class="card" id="security">
+  <h2>Password</h2>
+  {{if .HasPassword}}<p class="mut small">A password is set. You can change it below.</p>
+  {{else}}<p class="mut small">No password is set, so BrokerBuddy only answers on this computer. Set one to allow access from other devices or the internet.</p>{{end}}
+  <form method="post" action="/settings/password" class="stack">
+    <div class="fields">
+      {{if .HasPassword}}<label class="f">Current password<input type="password" name="current" autocomplete="current-password" required></label>{{end}}
+      <label class="f">New password (8+ characters)<input type="password" name="password" autocomplete="new-password" minlength="8" required></label>
+      <label class="f">Repeat new password<input type="password" name="again" autocomplete="new-password" minlength="8" required></label>
+    </div>
+    <div><button class="primary">{{if .HasPassword}}Change password{{else}}Set password{{end}}</button></div>
+  </form>
+  {{if .HasPassword}}
+  <form method="post" action="/settings/password/remove" class="row" style="margin-top:14px" onsubmit="return confirm('Remove the password? The app will only answer on this computer.')">
+    <input type="password" name="current" placeholder="Current password" autocomplete="current-password" required aria-label="Current password">
+    <button class="danger">Remove password</button>
+  </form>{{end}}
+</section>
+
+<section class="card" id="access">
+  <h2>Access &amp; HTTPS</h2>
+  <p class="mut small">Everything is always reachable at <code>https://{{.LocalAddr}}</code> on this computer (self-signed certificate: accept the browser warning once). Pick how else it can be reached.</p>
+  <form method="post" action="/settings/network" class="stack" id="netform">
+    <label class="opt"><input type="radio" name="mode" value="local" {{if eq .NetMode "local"}}checked{{end}}><span><strong>This computer only</strong><div class="mut small">Nothing is exposed to your network or the internet.</div></span></label>
+
+    <label class="opt"><input type="radio" name="mode" value="letsencrypt" {{if eq .NetMode "letsencrypt"}}checked{{end}}><span><strong>Internet, with a free Let's Encrypt certificate</strong>
+      <div class="mut small">Needs a domain name pointing at this computer and ports 80 and 443 reachable from the internet (open them on your firewall/router). Requires a password.</div></span></label>
+    <div class="sub fields" data-for="letsencrypt">
+      <label class="f">Domain<input name="domain" value="{{.NetDomain}}" placeholder="money.example.com" autocomplete="off" spellcheck="false"></label>
+      <label class="f">Email for expiry notices (optional)<input name="email" type="email" value="{{.NetEmail}}" autocomplete="off"></label>
+      <label class="small mut" style="align-self:end"><input type="checkbox" name="staging" {{if .NetStaging}}checked{{end}}> Use Let's Encrypt test server (browsers won't trust it; avoids rate limits while trying)</label>
+    </div>
+
+    <label class="opt"><input type="radio" name="mode" value="custom" {{if eq .NetMode "custom"}}checked{{end}}><span><strong>Network or internet, with my own certificate</strong>
+      <div class="mut small">Paste a certificate and private key (PEM). Requires a password.</div></span></label>
+    <div class="sub stack" data-for="custom">
+      <label class="f">Listen address<input name="addr" value="{{.NetAddr}}" placeholder=":443" autocomplete="off" style="max-width:200px"></label>
+      <label class="f">Certificate (PEM){{if .CertSet}} <span class="ok small">saved</span>{{end}}<textarea name="cert" rows="4" spellcheck="false" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>
+      <label class="f">Private key (PEM, stored encrypted){{if .CertSet}} <span class="small">leave blank to keep</span>{{end}}<textarea name="key" rows="4" spellcheck="false" placeholder="-----BEGIN PRIVATE KEY-----"></textarea></label>
+    </div>
+    <div><button class="primary">Save &amp; apply</button></div>
+  </form>
+
+  <h2 style="margin-top:22px">Status</h2>
+  <div class="list">
+    {{range .Status}}<div><span class="{{if .OK}}ok{{else}}bad{{end}}">{{.Kind}} <code>{{.Addr}}</code></span><span class="mut small">{{if .OK}}listening{{else}}{{.Detail}}{{end}}</span></div>{{end}}
+  </div>
+  <p class="mut small">Let's Encrypt gets the certificate on the first visit to your domain, which can take a few seconds.</p>
+</section>
+
+<section class="card" id="about">
+  <h2>Your data</h2>
+  <p class="mut small">Everything is stored on this computer. Back up both files together: without the key file, saved secrets (bank tokens, Plaid secret) can't be read.</p>
+  <div class="list">
+    <div><span>Database</span><code>{{.DBPath}}</code></div>
+    <div><span>Encryption key</span><code>{{.KeyPath}}</code></div>
+  </div>
+</section>
+</main>
+<script>
+// show only the options that belong to the selected access mode
+(function () {
+  var f = document.getElementById('netform');
+  function sync() {
+    var mode = f.querySelector('input[name=mode]:checked').value;
+    f.querySelectorAll('[data-for]').forEach(function (el) { el.hidden = el.dataset.for !== mode; });
+  }
+  f.addEventListener('change', sync); sync();
+})();
+</script>
+</body>
+</html>

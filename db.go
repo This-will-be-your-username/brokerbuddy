@@ -62,6 +62,10 @@ CREATE TABLE IF NOT EXISTS mortgage_rates (
 	fetched_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_rates_rate ON mortgage_rates(rate);
+CREATE TABLE IF NOT EXISTS settings (
+	key TEXT PRIMARY KEY,
+	value TEXT NOT NULL                  -- secrets are stored AES-GCM encrypted
+);
 CREATE TABLE IF NOT EXISTS rules (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	pattern TEXT NOT NULL,               -- case-insensitive substring of name/merchant

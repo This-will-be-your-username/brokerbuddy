@@ -220,14 +220,14 @@ func (a *app) lookupUnknown(w http.ResponseWriter, r *http.Request) {
 	if len(keys) == 0 {
 		msg = "No unmatched merchants left to look up."
 	}
-	http.Redirect(w, r, "/transactions?msg="+url.QueryEscape(msg), http.StatusSeeOther)
+	http.Redirect(w, r, "/settings?msg="+url.QueryEscape(msg), http.StatusSeeOther)
 }
 
 func (a *app) lookupDelete(w http.ResponseWriter, r *http.Request) {
 	// Keep a blank entry so a rejected guess isn't looked up again.
 	a.db.Exec(`UPDATE merchant_cache SET category='', detail='rejected by user' WHERE key=?`, r.FormValue("key"))
 	recategorizeAll(a.db)
-	http.Redirect(w, r, "/transactions", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings#categorisation", http.StatusSeeOther)
 }
 
 func (a *app) recategorize(w http.ResponseWriter, r *http.Request) {
@@ -235,5 +235,5 @@ func (a *app) recategorize(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, 500)
 		return
 	}
-	http.Redirect(w, r, "/transactions?msg=Recategorised", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings?msg=Recategorised", http.StatusSeeOther)
 }

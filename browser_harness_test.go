@@ -17,13 +17,12 @@ func TestBrowserHarness(t *testing.T) {
 	if secs == 0 {
 		t.Skip("set BB_BROWSER=<seconds> to run")
 	}
-	db, err := openDB(os.Getenv("BB_DB"))
+	a, err := newApp(os.Getenv("BB_DB"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	v, _ := newVault("x")
-	a := &app{db: db, vault: v, tpl: parseTemplates()}
-	srv := httptest.NewUnstartedServer(sameOrigin(a.routes()))
+	a.net = newNetManager(a, nil, "127.0.0.1:8765") // not started: lets the Settings page show status
+	srv := httptest.NewUnstartedServer(a.routes())
 	l, err := newLocalListener("127.0.0.1:8765")
 	if err != nil {
 		t.Fatal(err)

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in · BrokerBuddy</title>
+{{template "style"}}
+</head>
+<body>
+<main style="max-width:380px;padding-top:12vh">
+  <h1 style="text-align:center;margin-bottom:18px">BrokerBuddy</h1>
+  <form class="card stack" method="post" action="/login">
+    <input type="hidden" name="next" value="{{.Next}}">
+    {{if .Error}}<div class="neg" role="alert">{{.Error}}</div>{{end}}
+    <label class="f">Password<input type="password" name="password" autocomplete="current-password" autofocus required></label>
+    <button class="primary">Sign in</button>
+  </form>
+</main>
+</body>
+</html>

@@ -272,5 +272,5 @@ func (a *app) importRun(w http.ResponseWriter, r *http.Request) {
 
 func (a *app) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	a.db.Exec(`DELETE FROM accounts WHERE plaid_account_id=? AND item_id IS NULL`, r.FormValue("id"))
-	http.Redirect(w, r, "/transactions", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings#banks", http.StatusSeeOther)
 }

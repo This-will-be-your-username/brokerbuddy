@@ -10,7 +10,7 @@ var (
 // syncItemByPlaidID pulls new/changed/removed transactions via cursor-based /transactions/sync
 // and stores them atomically, advancing the cursor only on commit.
 func (a *app) syncItemByPlaidID(plaidItemID string) error {
-	if a.plaid == nil {
+	if a.pc() == nil {
 		return errNoPlaid
 	}
 	var id int
@@ -31,7 +31,7 @@ func (a *app) syncItemByPlaidID(plaidItemID string) error {
 	// Collect all pages first so a mid-way failure doesn't leave a half-applied state.
 	var all []syncResult
 	for {
-		res, err := a.plaid.sync(access, cursor)
+		res, err := a.pc().sync(access, cursor)
 		if err != nil {
 			return err
 		}
