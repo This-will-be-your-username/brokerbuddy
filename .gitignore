@@ -1,0 +1,22 @@
+# build output
+/brokerbuddy
+/brokerbuddy.exe
+*.test
+
+# local data: databases, certificates and secrets never belong in git
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+/certs/
+.env
+.env.*
+*.pem
+*.key
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.claude/
