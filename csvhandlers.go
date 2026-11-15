@@ -61,8 +61,10 @@ type optView struct {
 }
 type acctOpt struct{ ID, Name string }
 type previewRow struct {
-	Date, Desc, Cat string
-	Amount          float64
+	Date, Desc, Cat  string // Cat = the category column from the file, if any
+	Amount           float64
+	Pred, Level, Why string // predicted category, confidence level and the reason
+	Conf             int
 }
 
 func colOpts(header []string, cur int, none bool) []optView {
@@ -161,12 +163,19 @@ func (a *app) renderUploadError(w http.ResponseWriter, err error) {
 func (a *app) renderMapping(w http.ResponseWriter, tok string, s *importSession, m mapping, acct, newName, errMsg, _ string) {
 	conv, skipped := convertRows(s.data, m)
 	var prev []previewRow
+	levels := map[string]int{}
 	if m.valid(len(s.header)) == nil {
+		cl, err := newClassifier(a.db)
 		for i, t := range conv {
-			if i >= 8 {
+			if err != nil {
 				break
 			}
-			prev = append(prev, previewRow{t.Date, t.Desc, strings.TrimPrefix(t.Cat, "csv:"), t.Amount})
+			r := cl.classifyFull(t.Desc, "", t.Cat, t.Amount)
+			lvl := confLevel(r.Conf, false, r.Cat)
+			levels[lvl]++
+			if i < 8 {
+				prev = append(prev, previewRow{t.Date, t.Desc, strings.TrimPrefix(t.Cat, "csv:"), t.Amount, r.Cat, lvl, srcWhy(r.Src, false), r.Conf})
+			}
 		}
 	}
 	var layouts []optView
@@ -184,7 +193,7 @@ func (a *app) renderMapping(w http.ResponseWriter, tok string, s *importSession,
 		"Desc2Opts": colOpts(s.header, m.Desc2, true), "AmountOpts": colOpts(s.header, m.Amount, false),
 		"DebitOpts": colOpts(s.header, m.Debit, false), "CreditOpts": colOpts(s.header, m.Credit, false),
 		"CatOpts": colOpts(s.header, m.Category, true), "Layouts": layouts,
-		"Accounts": a.manualAccounts(), "Acct": acct, "NewName": newName, "Notes": s.notes,
+		"Levels": levels, "Accounts": a.manualAccounts(), "Acct": acct, "NewName": newName, "Notes": s.notes,
 	})
 }
 
@@ -265,17 +274,19 @@ func (a *app) importRun(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	added := 0
+	levels := map[string]int{} // confidence of the transactions actually added
 	for i, t := range txns {
-		cat, src := cl.classify(t.Desc, "", t.Cat, t.Amount)
-		res, err := tx.Exec(`INSERT INTO transactions(plaid_txn_id,account_id,date,name,merchant,amount,plaid_category,category,cat_source)
-			VALUES(?,?,?,?,'',?,?,?,?) ON CONFLICT(plaid_txn_id) DO NOTHING`,
-			ids[i], acct, t.Date, t.Desc, t.Amount, t.Cat, cat, src)
+		cr := cl.classifyFull(t.Desc, "", t.Cat, t.Amount)
+		res, err := tx.Exec(`INSERT INTO transactions(plaid_txn_id,account_id,date,name,merchant,amount,plaid_category,category,cat_source,confidence)
+			VALUES(?,?,?,?,'',?,?,?,?,?) ON CONFLICT(plaid_txn_id) DO NOTHING`,
+			ids[i], acct, t.Date, t.Desc, t.Amount, t.Cat, cr.Cat, cr.Src, cr.Conf)
 		if err != nil {
 			fail(w, err, 500)
 			return
 		}
 		if n, _ := res.RowsAffected(); n > 0 {
 			added++
+			levels[confLevel(cr.Conf, false, cr.Cat)]++
 		}
 	}
 	js, _ := json.Marshal(m)
@@ -289,8 +300,16 @@ func (a *app) importRun(w http.ResponseWriter, r *http.Request) {
 	sessions.Lock()
 	delete(sessions.m, tok)
 	sessions.Unlock()
-	msg := fmt.Sprintf("Imported %d transactions (%d duplicates skipped)", added, len(txns)-added)
-	http.Redirect(w, r, "/?msg="+url.QueryEscape(msg), http.StatusSeeOther)
+	msg := fmt.Sprintf("Imported %d transactions (%d duplicates skipped).", added, len(txns)-added)
+	dest := "/?msg="
+	if need := levels["low"] + levels["unknown"]; need > 0 {
+		// take the user straight to what needs a look, lowest confidence first
+		msg += fmt.Sprintf(" %d high, %d medium, %d low confidence: review the ones below.", levels["high"], levels["medium"], need)
+		dest = "/transactions?confidence=review&msg="
+	} else if added > 0 {
+		msg += " All were categorised with good confidence."
+	}
+	http.Redirect(w, r, dest+url.QueryEscape(msg), http.StatusSeeOther)
 }
 
 func (a *app) deleteAccount(w http.ResponseWriter, r *http.Request) {

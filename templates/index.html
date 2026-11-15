@@ -25,9 +25,15 @@
     <select name="category" aria-label="Category"><option value="">All categories</option>
       {{range .Cats}}<option {{if eq . $.Category}}selected{{end}}>{{.}}</option>{{end}}
     </select>
+    <input type="hidden" name="confidence" value="{{.Conf}}">
     <button>Filter</button>
-    {{if or .Q .Category}}<a href="/transactions">Clear</a>{{end}}
+    {{if or .Q .Category .Conf}}<a href="/transactions">Clear</a>{{end}}
   </form>
+  <div class="row" style="margin-top:12px" role="group" aria-label="Filter by confidence">
+    <span class="mut small">Confidence:</span>
+    {{range .Chips}}<a class="chip {{if .Active}}on{{end}} chip-{{.Level}}" href="{{.URL}}" {{if .Active}}aria-current="true"{{end}}>{{.Label}} <b>{{.Count}}</b></a>{{end}}
+  </div>
+  {{if eq .Conf "review"}}<p class="mut small" style="margin:10px 0 0">Least sure first, with the same merchants together. Setting one category also fixes the other transactions from that merchant.</p>{{end}}
 </div>
 
 <div class="card scroll">
@@ -40,10 +46,11 @@
       <td>
         <form class="inline" method="post" action="/txn/category">
           <input type="hidden" name="id" value="{{.ID}}">
-          <input name="category" value="{{.Category}}" list="cats" size="16" onchange="this.form.submit()" aria-label="Category">
+          <input name="category" value="{{.Category}}" list="cats" size="21" onchange="this.form.submit()" aria-label="Category">
+          {{if not .Manual}}<button class="confirm" title="Confirm this category" aria-label="Confirm category">✓</button>{{end}}
           <label class="mut small" title="Also remember this as a rule for this merchant"><input type="checkbox" name="make_rule"> rule</label>
         </form>
-        {{if .Manual}}<span class="pill" title="Set by you">edited</span>{{end}}{{if eq .Source "learned"}}<span class="pill" title="Matched to a similar transaction you categorised yourself">learned</span>{{end}}{{if eq .Source "lookup"}}<span class="pill" title="Guessed from an online lookup. Please check.">lookup</span>{{end}}
+        <span class="conf conf-{{.Level}}" title="{{.Why}}">{{if eq .Level "confirmed"}}confirmed{{else if eq .Level "unknown"}}unknown{{else}}{{.Level}} · {{.Conf}}{{end}}</span>
       </td>
       <td class="amt {{if lt .Amount 0.0}}in{{else}}out{{end}}">{{printf "%.2f" (neg .Amount)}}</td>
     </tr>

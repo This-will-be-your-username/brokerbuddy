@@ -58,10 +58,11 @@
 <div class="card scroll">
   <h2>Preview ({{.Valid}} of {{.Rows}} rows readable{{if .Skipped}}, {{.Skipped}} skipped{{end}})</h2>
   <p class="mut">Check that money you spent shows as an outflow (positive) and income as negative/green.</p>
-  <table><tr><th>Date</th><th>Description</th><th>Bank category</th><th style="text-align:right">Shown as</th></tr>
-  {{range .Preview}}<tr><td>{{.Date}}</td><td>{{.Desc}}</td><td class="mut">{{.Cat}}</td>
+  {{if .Levels}}<p class="small">Predicted categories for all {{.Valid}} rows: <span class="conf conf-high">{{index .Levels "high"}} high</span> <span class="conf conf-medium">{{index .Levels "medium"}} medium</span> <span class="conf conf-low">{{index .Levels "low"}} low</span> <span class="conf conf-unknown">{{index .Levels "unknown"}} unknown</span>. After importing you can filter by confidence to fix the doubtful ones.</p>{{end}}
+  <table><tr><th>Date</th><th>Description</th><th>Predicted category</th><th>Confidence</th><th style="text-align:right">Shown as</th></tr>
+  {{range .Preview}}<tr><td>{{.Date}}</td><td>{{.Desc}}</td><td>{{.Pred}}</td><td><span class="conf conf-{{.Level}}" title="{{.Why}}">{{.Level}} · {{.Conf}}</span></td>
     <td class="amt {{if lt .Amount 0.0}}in{{else}}out{{end}}">{{if lt .Amount 0.0}}+{{printf "%.2f" (neg .Amount)}} in{{else}}{{printf "%.2f" .Amount}} out{{end}}</td></tr>
-  {{else}}<tr><td colspan="4" class="mut">Nothing readable yet — adjust the mapping above.</td></tr>{{end}}</table>
+  {{else}}<tr><td colspan="5" class="mut">Nothing readable yet — adjust the mapping above.</td></tr>{{end}}</table>
 </div>
 
 <div class="card">

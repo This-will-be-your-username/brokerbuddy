@@ -109,7 +109,7 @@ func covered(ex, txn []string) bool {
 }
 
 func loadLearner(db *sql.DB) (*learner, error) {
-	rows, err := db.Query(`SELECT name, merchant, category FROM transactions WHERE manual=1 AND category<>'Uncategorized' ORDER BY rowid`)
+	rows, err := db.Query(`SELECT name, merchant, category FROM transactions WHERE manual=1 AND category<>'Uncategorized' ORDER BY edited_seq, rowid`)
 	if err != nil {
 		return nil, err
 	}

@@ -120,24 +120,30 @@ func norm(s string) string {
 
 func isIncomeCat(c string) bool { return groupOf[c] == gIncome }
 
-// dictMatch returns the longest matching phrase's category. Credits may match anything
+// dictLookup returns the longest matching phrase's category. Credits may match anything
 // (a refund keeps its spend category); debits can't be income categories.
-func dictMatch(text string, amount float64) (string, bool) {
+func dictLookup(text string, amount float64) (cat, phrase string, glued, ok bool) {
 	t := " " + text + " "
 	compact := strings.ReplaceAll(text, " ", "")
 	for _, e := range dict { // sorted longest-first, so first hit is best
 		if amount > 0 && isIncomeCat(e.cat) {
 			continue
 		}
-		if strings.Contains(t, " "+e.pat+" ") || (len(e.compact) >= 7 && strings.Contains(compact, e.compact)) {
+		whole := strings.Contains(t, " "+e.pat+" ")
+		if whole || (len(e.compact) >= 7 && strings.Contains(compact, e.compact)) {
 			cat := e.cat
 			if cat == "Rent" && amount < 0 {
 				cat = "Rental Income"
 			}
-			return cat, true
+			return cat, e.pat, !whole, true
 		}
 	}
-	return "", false
+	return "", "", false, false
+}
+
+func dictMatch(text string, amount float64) (string, bool) {
+	cat, _, _, ok := dictLookup(text, amount)
+	return cat, ok
 }
 
 // ---- merchant name cleanup (used for lookup keys) -------------------------
@@ -174,6 +180,7 @@ type classifier struct {
 	rules []rule
 	cache map[string]cacheEntry
 	learn *learner // examples from your manual categorisations (nil-safe)
+	hist  *history // trustworthy categorised transactions, for similarity guesses (nil-safe)
 }
 
 // Plaid's coarse categories, mapped onto ours (used only as a last-resort hint).
@@ -184,40 +191,4 @@ var pfcMap = map[string]string{
 	"TRAVEL": "Travel & Holidays", "HOME_IMPROVEMENT": "Home & Strata", "TRANSFER_IN": "Transfers",
 	"TRANSFER_OUT": "Transfers", "LOAN_PAYMENTS": "Mortgage & Loan Repayments", "BANK_FEES": "Fees & Dishonours",
 	"GOVERNMENT_AND_NON_PROFIT": "Gifts & Donations",
-}
-
-// classify returns (category, source). source: rule | builtin | lookup | hint | "" (nothing matched).
-// Priority: your rules > built-in dictionary > cached online lookups > the bank's own category.
-func (c *classifier) classify(name, merchant, hint string, amount float64) (string, string) {
-	hay := strings.ToLower(name + " " + merchant)
-	for _, r := range c.rules {
-		if r.Pattern != "" && strings.Contains(hay, strings.ToLower(r.Pattern)) {
-			return r.Category, "rule"
-		}
-	}
-	lcat, strong, lok := c.learn.match(name, merchant, amount)
-	if lok && strong {
-		return lcat, "learned" // you categorised this merchant before: beats the built-in dictionary
-	}
-	text := norm(name + " " + merchant)
-	if cat, ok := dictMatch(text, amount); ok {
-		return cat, "builtin"
-	}
-	if lok {
-		return lcat, "learned" // brand-only match, used where the dictionary has no answer
-	}
-	if key := merchantKey(name + " " + merchant); key != "" {
-		for _, k := range []string{key, strings.Fields(key)[0]} { // full key, then first word (drops suburb noise)
-			if e, ok := c.cache[k]; ok && e.Category != "" {
-				return e.Category, "lookup"
-			}
-		}
-	}
-	if t, ok := strings.CutPrefix(hint, "csv:"); ok && strings.TrimSpace(t) != "" {
-		return strings.TrimSpace(t), "hint"
-	}
-	if cat, ok := pfcMap[hint]; ok && !(isIncomeCat(cat) && amount > 0) {
-		return cat, "hint"
-	}
-	return "Uncategorized", ""
 }

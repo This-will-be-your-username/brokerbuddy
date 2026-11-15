@@ -170,7 +170,35 @@ type txnRow struct {
 	ID, Date, Name, Account, Category, Source string
 	Amount                                    float64
 	Manual                                    bool
+	Conf                                      int
+	Level, Why                                string // confidence level (confirmed/high/medium/low/unknown) and the reason
 }
+
+type confChip struct {
+	Label, Level, URL string
+	Count             int
+	Active            bool
+}
+
+// confClause turns the ?confidence= filter into SQL.
+func confClause(f string) string {
+	switch f {
+	case "confirmed":
+		return "t.manual=1"
+	case "high":
+		return "t.manual=0 AND t.confidence>=80 AND t.category<>'Uncategorized'"
+	case "medium":
+		return "t.manual=0 AND t.confidence BETWEEN 50 AND 79 AND t.category<>'Uncategorized'"
+	case "low":
+		return "t.manual=0 AND t.confidence BETWEEN 1 AND 49 AND t.category<>'Uncategorized'"
+	case "unknown":
+		return "t.manual=0 AND (t.confidence=0 OR t.category='Uncategorized')"
+	case "review": // everything doubtful: low confidence or no category
+		return "t.manual=0 AND (t.confidence<50 OR t.category='Uncategorized')"
+	}
+	return ""
+}
+
 type catTotal struct {
 	Category string
 	Total    float64
@@ -187,7 +215,7 @@ type ruleView struct {
 
 func (a *app) index(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	cat, search := q.Get("category"), q.Get("q")
+	cat, search, conf := q.Get("category"), q.Get("q"), q.Get("confidence")
 
 	where, args := []string{"1=1"}, []any{}
 	if cat != "" {
@@ -198,19 +226,29 @@ func (a *app) index(w http.ResponseWriter, r *http.Request) {
 		where = append(where, "(t.name LIKE ? OR t.merchant LIKE ?)")
 		args = append(args, "%"+search+"%", "%"+search+"%")
 	}
+	baseW := strings.Join(where, " AND ") // category + search only, used for the confidence counts
+	if cc := confClause(conf); cc != "" {
+		where = append(where, cc)
+	}
 	W := strings.Join(where, " AND ")
+	order := "t.date DESC, t.plaid_txn_id"
+	if conf == "review" || conf == "low" || conf == "unknown" || conf == "medium" {
+		order = "t.confidence ASC, lower(t.name), t.date DESC" // least sure first, same merchants together
+	}
 
 	var txns []txnRow
-	rows, err := a.db.Query(`SELECT t.plaid_txn_id,t.date,t.name,a.name||CASE WHEN a.mask<>'' THEN ' ••'||a.mask ELSE '' END,t.category,t.amount,t.manual,t.cat_source
+	rows, err := a.db.Query(`SELECT t.plaid_txn_id,t.date,t.name,a.name||CASE WHEN a.mask<>'' THEN ' ••'||a.mask ELSE '' END,t.category,t.amount,t.manual,t.cat_source,t.confidence
 		FROM transactions t JOIN accounts a ON a.plaid_account_id=t.account_id
-		WHERE `+W+` ORDER BY t.date DESC, t.plaid_txn_id LIMIT 500`, args...)
+		WHERE `+W+` ORDER BY `+order+` LIMIT 500`, args...)
 	if err != nil {
 		fail(w, err, 500)
 		return
 	}
 	for rows.Next() {
 		var t txnRow
-		rows.Scan(&t.ID, &t.Date, &t.Name, &t.Account, &t.Category, &t.Amount, &t.Manual, &t.Source)
+		rows.Scan(&t.ID, &t.Date, &t.Name, &t.Account, &t.Category, &t.Amount, &t.Manual, &t.Source, &t.Conf)
+		t.Level = confLevel(t.Conf, t.Manual, t.Category)
+		t.Why = srcWhy(t.Source, t.Manual)
 		txns = append(txns, t)
 	}
 	rows.Close()
@@ -231,9 +269,44 @@ func (a *app) index(w http.ResponseWriter, r *http.Request) {
 
 	catList := allCategories()
 
+	// Confidence chips: how many transactions sit at each level (for the current search/category).
+	var nConfirmed, nHigh, nMedium, nLow, nUnknown int
+	a.db.QueryRow(`SELECT
+		COALESCE(SUM(t.manual=1),0),
+		COALESCE(SUM(t.manual=0 AND t.confidence>=80 AND t.category<>'Uncategorized'),0),
+		COALESCE(SUM(t.manual=0 AND t.confidence BETWEEN 50 AND 79 AND t.category<>'Uncategorized'),0),
+		COALESCE(SUM(t.manual=0 AND t.confidence BETWEEN 1 AND 49 AND t.category<>'Uncategorized'),0),
+		COALESCE(SUM(t.manual=0 AND (t.confidence=0 OR t.category='Uncategorized')),0)
+		FROM transactions t WHERE `+baseW, args...).Scan(&nConfirmed, &nHigh, &nMedium, &nLow, &nUnknown)
+	chipURL := func(level string) string {
+		v := url.Values{}
+		if search != "" {
+			v.Set("q", search)
+		}
+		if cat != "" {
+			v.Set("category", cat)
+		}
+		if level != "" {
+			v.Set("confidence", level)
+		}
+		if len(v) == 0 {
+			return "/transactions"
+		}
+		return "/transactions?" + v.Encode()
+	}
+	chips := []confChip{
+		{"All", "all", chipURL(""), nConfirmed + nHigh + nMedium + nLow + nUnknown, conf == ""},
+		{"Needs review", "review", chipURL("review"), nLow + nUnknown, conf == "review"},
+		{"Unknown", "unknown", chipURL("unknown"), nUnknown, conf == "unknown"},
+		{"Low", "low", chipURL("low"), nLow, conf == "low"},
+		{"Medium", "medium", chipURL("medium"), nMedium, conf == "medium"},
+		{"High", "high", chipURL("high"), nHigh, conf == "high"},
+		{"Confirmed", "confirmed", chipURL("confirmed"), nConfirmed, conf == "confirmed"},
+	}
+
 	a.tpl.ExecuteTemplate(w, "index.html", map[string]any{
 		"Txns": txns, "Totals": totals, "Cats": catList, "Max": maxTotal(totals),
-		"Category": cat, "Q": search, "PlaidReady": a.pc() != nil, "Flash": q.Get("msg"),
+		"Category": cat, "Q": search, "Conf": conf, "Chips": chips, "PlaidReady": a.pc() != nil, "Flash": q.Get("msg"),
 	})
 }
 
@@ -325,15 +398,15 @@ func (a *app) setCategory(w http.ResponseWriter, r *http.Request) {
 		fail(w, errBad, 400)
 		return
 	}
-	var before, after int
-	countLearned := func(n *int) {
-		a.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE manual=0 AND cat_source='learned' AND category=?`, cat).Scan(n)
-	}
-	countLearned(&before)
-	if _, err := a.db.Exec(`UPDATE transactions SET category=?, manual=1 WHERE plaid_txn_id=?`, cat, id); err != nil {
+	if _, err := a.db.Exec(`UPDATE transactions SET category=?, manual=1, confidence=100, cat_source='manual',
+		edited_seq=(SELECT COALESCE(MAX(edited_seq),0)+1 FROM transactions) WHERE plaid_txn_id=?`, cat, id); err != nil {
 		fail(w, err, 500)
 		return
 	}
+	// Count what the history lookup below changes (the row just edited no longer counts), so the user is told.
+	count := func(sql string, args ...any) (n int) { a.db.QueryRow(sql, args...).Scan(&n); return }
+	beforeCat := count(`SELECT COUNT(*) FROM transactions WHERE manual=0 AND category=?`, cat)
+	beforeUnknown := count(`SELECT COUNT(*) FROM transactions WHERE manual=0 AND (confidence<50 OR category='Uncategorized')`)
 	if r.FormValue("make_rule") == "on" {
 		var name, merchant string
 		a.db.QueryRow(`SELECT name, merchant FROM transactions WHERE plaid_txn_id=?`, id).Scan(&name, &merchant)
@@ -345,17 +418,25 @@ func (a *app) setCategory(w http.ResponseWriter, r *http.Request) {
 			a.db.Exec(`INSERT INTO rules(pattern,category) VALUES(?,?)`, pat, cat)
 		}
 	}
-	// Every manual edit teaches the classifier: re-run it so similar transactions follow.
-	if err := recategorizeAll(a.db); err != nil {
+	// Look through the transaction history: other transactions from the same merchant, whether
+	// uncategorised or low confidence, take this category (and anything close to it follows).
+	// The edit just made is now a confirmed example the classifier learns from.
+	a.applyToSameMerchant(id, cat)
+	if _, err := recategorize(a.db); err != nil {
 		log.Println("recategorize:", err)
 	}
-	countLearned(&after)
+	applied := count(`SELECT COUNT(*) FROM transactions WHERE manual=0 AND category=?`, cat) - beforeCat
+	fixed := beforeUnknown - count(`SELECT COUNT(*) FROM transactions WHERE manual=0 AND (confidence<50 OR category='Uncategorized')`)
 	dest := "/transactions"
 	if ref, err := url.Parse(r.Header.Get("Referer")); err == nil && ref.Path != "" {
 		q := ref.Query()
 		q.Del("msg")
-		if after > before {
-			q.Set("msg", fmt.Sprintf("Also applied to %d similar transactions", after-before))
+		if applied > 0 {
+			msg := fmt.Sprintf("Also applied “%s” to %d other transaction(s) from the same or a similar merchant", cat, applied)
+			if fixed > 0 {
+				msg += fmt.Sprintf(", %d of them were unsure", fixed)
+			}
+			q.Set("msg", msg+".")
 		}
 		dest = ref.Path + "?" + q.Encode()
 	}
@@ -372,8 +453,12 @@ func (a *app) addRule(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, 500)
 		return
 	}
-	recategorizeAll(a.db)
-	http.Redirect(w, r, "/settings#categorisation", http.StatusSeeOther)
+	n, _ := recategorize(a.db)
+	msg := "Rule added."
+	if n > 0 {
+		msg = fmt.Sprintf("Rule added and applied to %d transaction(s).", n)
+	}
+	http.Redirect(w, r, "/settings?msg="+url.QueryEscape(msg)+"#categorisation", http.StatusSeeOther)
 }
 
 func (a *app) deleteRule(w http.ResponseWriter, r *http.Request) {

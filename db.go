@@ -31,7 +31,9 @@ CREATE TABLE IF NOT EXISTS transactions (
 	plaid_category TEXT NOT NULL DEFAULT '',
 	category TEXT NOT NULL DEFAULT 'Uncategorized',
 	manual INTEGER NOT NULL DEFAULT 0,   -- 1 = user override, never auto-recategorized
-	cat_source TEXT NOT NULL DEFAULT ''  -- rule | builtin | lookup | hint | '' (unmatched)
+	cat_source TEXT NOT NULL DEFAULT '', -- rule | builtin | learned | lookup | hint | fuzzy | history | cue | manual | '' (unmatched)
+	confidence INTEGER NOT NULL DEFAULT 0, -- 0-100; 100 = set by you
+	edited_seq INTEGER NOT NULL DEFAULT 0  -- order of manual edits: the most recent edit wins when examples disagree
 );
 CREATE INDEX IF NOT EXISTS idx_txn_date ON transactions(date DESC);
 CREATE TABLE IF NOT EXISTS csv_profiles (
@@ -84,5 +86,8 @@ func openDB(path string) (*sql.DB, error) {
 	}
 	// Upgrade databases created before cat_source existed (error = column already there).
 	db.Exec(`ALTER TABLE transactions ADD COLUMN cat_source TEXT NOT NULL DEFAULT ''`)
+	db.Exec(`ALTER TABLE transactions ADD COLUMN confidence INTEGER NOT NULL DEFAULT 0`)
+	db.Exec(`ALTER TABLE transactions ADD COLUMN edited_seq INTEGER NOT NULL DEFAULT 0`)
+	db.Exec(`UPDATE transactions SET confidence=100, cat_source='manual' WHERE manual=1 AND confidence<100`)
 	return db, nil
 }

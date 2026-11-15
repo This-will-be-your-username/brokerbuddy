@@ -130,7 +130,7 @@ func (a *app) dashboard(w http.ResponseWriter, r *http.Request) {
 		savings = rep.SurplusM / rep.IncomeM * 100
 	}
 	var uncat int
-	a.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE category='Uncategorized' AND manual=0`).Scan(&uncat)
+	a.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE manual=0 AND (confidence<50 OR category='Uncategorized')`).Scan(&uncat)
 	a.tpl.ExecuteTemplate(w, "dashboard.html", map[string]any{
 		"Rep": rep, "Data": data, "Top": topCats, "Recent": recent, "Months": months,
 		"SavingsRate": savings, "Uncat": uncat, "Flash": r.URL.Query().Get("msg"),

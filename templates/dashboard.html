@@ -27,7 +27,7 @@
   <div class="kpi"><span>Savings rate</span><b class="{{if lt .SavingsRate 0.0}}neg{{end}}">{{printf "%.0f" .SavingsRate}}%</b></div>
 </div>
 
-{{if gt .Uncat 0}}<div class="card" role="note">{{.Uncat}} transactions are still <a href="/transactions?category=Uncategorized">Uncategorized</a>, so spending is only partly bucketed. Setting a few categories teaches the app to sort the rest.</div>{{end}}
+{{if gt .Uncat 0}}<div class="card" role="note">{{.Uncat}} transactions were categorised with low confidence, so the buckets below are only partly reliable. <a href="/transactions?confidence=review">Review them</a>: setting one category also fixes the other transactions from the same merchant.</div>{{end}}
 
 <div class="card"><h2>Income vs expenses by month</h2>
   <div class="chartbox"><canvas id="c-monthly" role="img" aria-label="Monthly income versus expenses"></canvas></div>

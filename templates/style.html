@@ -85,6 +85,17 @@ td.grow{width:100%;max-width:0;min-width:150px}
 .clamp.over:hover{color:var(--fg)}
 .clamp.open{white-space:normal;overflow:visible;overflow-wrap:anywhere}
 
+/* confidence pills */
+.conf{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:500;border:1px solid currentColor;white-space:nowrap}
+.conf-high{color:var(--pos)}.conf-confirmed{color:var(--acc)}.conf-medium{color:var(--warn)}.conf-low,.conf-unknown{color:var(--neg)}
+
+/* confidence filter chips and the confirm button */
+.chip{display:inline-flex;gap:6px;align-items:center;padding:3px 11px;border:1px solid var(--line);border-radius:999px;color:var(--mut);background:var(--card);font-size:13px}
+.chip b{font-weight:600;color:var(--fg)}
+.chip:hover{background:var(--soft);text-decoration:none;color:var(--fg)}
+.chip.on{background:var(--acc);border-color:var(--acc);color:var(--acc-fg)}.chip.on b{color:var(--acc-fg)}
+button.confirm{padding:2px 9px;color:var(--pos);border-color:var(--line)}
+
 /* top navigation */
 nav.top{display:flex;gap:2px;flex-wrap:wrap;align-items:center;padding:14px 0;margin-bottom:12px}
 nav.top a{padding:6px 12px;border-radius:10px;color:var(--mut);font-weight:500}

@@ -1,6 +1,9 @@
 package main
 
-import "database/sql"
+import (
+	"database/sql"
+	"strings"
+)
 
 type rule struct{ Pattern, Category string }
 
@@ -54,41 +57,143 @@ func newClassifier(db *sql.DB) (*classifier, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &classifier{rules: r, cache: c, learn: l}, nil
+	h, err := loadHistory(db)
+	if err != nil {
+		return nil, err
+	}
+	return &classifier{rules: r, cache: c, learn: l, hist: h}, nil
+}
+
+// loadHistory collects merchants whose category is trustworthy, to guess for look-alikes.
+// Earlier guesses (fuzzy, history, cue, hint) are excluded so errors can't feed on themselves.
+func loadHistory(db *sql.DB) (*history, error) {
+	rows, err := db.Query(`SELECT name, merchant, category, CASE WHEN manual=1 THEN 100 ELSE confidence END FROM transactions
+		WHERE category<>'Uncategorized' AND (manual=1 OR cat_source IN ('rule','builtin','learned','lookup'))`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	h := &history{}
+	seen := map[string]int{}
+	for rows.Next() {
+		var n, m, c string
+		var conf int
+		if err := rows.Scan(&n, &m, &c, &conf); err != nil {
+			return nil, err
+		}
+		toks := descriptorTokens(n + " " + m)
+		if len(toks) == 0 {
+			continue
+		}
+		key := strings.Join(toks, " ")
+		id := key + "|" + c
+		if i, ok := seen[id]; ok {
+			h.ex[i].conf = max(h.ex[i].conf, conf)
+			continue
+		}
+		seen[id] = len(h.ex)
+		h.ex = append(h.ex, histEx{toks, key, c, conf})
+	}
+	return h, rows.Err()
 }
 
 // recategorizeAll reapplies the classifier to every transaction the user hasn't set by hand.
 func recategorizeAll(db *sql.DB) error {
+	_, err := recategorize(db)
+	return err
+}
+
+// recategorize returns how many transactions ended up with a different category.
+func recategorize(db *sql.DB) (int, error) {
 	cl, err := newClassifier(db)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	rows, err := db.Query(`SELECT plaid_txn_id, name, merchant, plaid_category, amount FROM transactions WHERE manual=0`)
+	rows, err := db.Query(`SELECT plaid_txn_id, name, merchant, plaid_category, amount, category, confidence FROM transactions WHERE manual=0`)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	type upd struct{ id, cat, src string }
+	type upd struct {
+		id  string
+		res result
+	}
 	var ups []upd
+	changed := 0
 	for rows.Next() {
-		var id, n, m, p string
+		var id, n, m, p, oldCat string
 		var amt float64
-		if err := rows.Scan(&id, &n, &m, &p, &amt); err != nil {
+		var oldConf int
+		if err := rows.Scan(&id, &n, &m, &p, &amt, &oldCat, &oldConf); err != nil {
 			rows.Close()
-			return err
+			return 0, err
 		}
-		cat, src := cl.classify(n, m, p, amt)
-		ups = append(ups, upd{id, cat, src})
+		r := cl.classifyFull(n, m, p, amt)
+		if r.Cat != oldCat {
+			changed++
+		}
+		ups = append(ups, upd{id, r})
 	}
 	rows.Close()
 	tx, err := db.Begin()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer tx.Rollback()
 	for _, u := range ups {
-		if _, err := tx.Exec(`UPDATE transactions SET category=?, cat_source=? WHERE plaid_txn_id=?`, u.cat, u.src, u.id); err != nil {
-			return err
+		if _, err := tx.Exec(`UPDATE transactions SET category=?, cat_source=?, confidence=? WHERE plaid_txn_id=?`, u.res.Cat, u.res.Src, u.res.Conf, u.id); err != nil {
+			return 0, err
 		}
 	}
-	return tx.Commit()
+	return changed, tx.Commit()
+}
+
+// applyToSameMerchant looks through the transaction history for other transactions from the same
+// merchant as the edited one (same descriptor words once store numbers, suburbs and states are
+// stripped) and gives the ones you haven't set yourself the new category. It returns how many
+// changed. Credits and debits are kept apart: a debit never becomes income.
+func (a *app) applyToSameMerchant(id, cat string) (int, error) {
+	var name, merchant string
+	var amount float64
+	if err := a.db.QueryRow(`SELECT name, merchant, amount FROM transactions WHERE plaid_txn_id=?`, id).Scan(&name, &merchant, &amount); err != nil {
+		return 0, err
+	}
+	key := strings.Join(descriptorTokens(name+" "+merchant), " ")
+	if key == "" {
+		return 0, nil
+	}
+	rows, err := a.db.Query(`SELECT plaid_txn_id, name, merchant, amount, category, confidence FROM transactions WHERE manual=0 AND plaid_txn_id<>?`, id)
+	if err != nil {
+		return 0, err
+	}
+	var ids []string
+	for rows.Next() {
+		var tid, n, m, c string
+		var amt float64
+		var conf int
+		if err := rows.Scan(&tid, &n, &m, &amt, &c, &conf); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		if (c == cat && conf >= 90) || (isIncomeCat(cat) && amt > 0) {
+			continue
+		}
+		if strings.Join(descriptorTokens(n+" "+m), " ") == key {
+			ids = append(ids, tid)
+		}
+	}
+	rows.Close()
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	tx, err := a.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	for _, tid := range ids {
+		if _, err := tx.Exec(`UPDATE transactions SET category=?, cat_source='learned', confidence=90 WHERE plaid_txn_id=?`, cat, tid); err != nil {
+			return 0, err
+		}
+	}
+	return len(ids), tx.Commit()
 }
