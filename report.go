@@ -33,6 +33,8 @@ type report struct {
 	IncomeM, ExpensesM, SurplusM float64
 	Flags                        []repFlag
 	Empty                        bool
+	UncatM                       float64 // uncategorised spending per month (included in ExpensesM)
+	UncatN                       int
 }
 
 func (a *app) buildReport(months int) (*report, error) { return a.buildReportOpt(months, false) }
@@ -112,6 +114,11 @@ func (a *app) buildReportOpt(months int, skipCurrent bool) (*report, error) {
 	rep.IncomeM = groups[gIncome].Monthly
 	for _, g := range []string{gEss, gDisc, gDebt, gRisk} {
 		rep.ExpensesM += groups[g].Monthly
+	}
+	// Spending nobody has categorised yet is still spending: it counts toward the total and is shown on its own.
+	if l, ok := byCat["Uncategorized"]; ok && l.Total > 0 {
+		rep.UncatM, rep.UncatN = l.Total/rep.SpanMonths, l.Count
+		rep.ExpensesM += rep.UncatM
 	}
 	rep.SurplusM = rep.IncomeM - rep.ExpensesM
 	for _, g := range order {

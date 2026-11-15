@@ -103,8 +103,11 @@ func (a *app) dashboard(w http.ResponseWriter, r *http.Request) {
 				topCats = append(topCats, dashCat{Category: l.Category, Monthly: l.Monthly})
 			}
 		}
+		if rep.UncatM > 0 {
+			topCats = append(topCats, dashCat{Category: "Uncategorized", Monthly: rep.UncatM})
+		}
 		sort.Slice(topCats, func(i, j int) bool { return topCats[i].Monthly > topCats[j].Monthly })
-		if len(topCats) > 8 {
+		if len(topCats) > 9 {
 			topCats = topCats[:8]
 		}
 		for i := range topCats {
