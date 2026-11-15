@@ -1,0 +1,362 @@
+[
+ {
+  "date": "2026-05-01",
+  "desc": "WOOLWORTHS 1234 SYDNEY AUS",
+  "debit": 10,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-02",
+  "desc": "STARBUCKS 22 NEWTOWN AUS",
+  "debit": 17.3,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-03",
+  "desc": "AGL ENERGY",
+  "debit": 24.6,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-04",
+  "desc": "BUNNINGS 7788 PENRITH AUS",
+  "debit": 31.9,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-05",
+  "desc": "NETFLIX.COM",
+  "debit": 39.2,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-06",
+  "desc": "CHEMIST WAREHOUSE 14 SYDNEY AUS",
+  "debit": 46.5,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-07",
+  "desc": "ALDI STORES 88 AUS",
+  "debit": 53.8,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-08",
+  "desc": "BP 5566 PARRAMATTA AUS",
+  "debit": 61.1,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-09",
+  "desc": "WOOLWORTHS 1234 SYDNEY AUS",
+  "debit": 68.4,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-10",
+  "desc": "STARBUCKS 22 NEWTOWN AUS",
+  "debit": 75.7,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-11",
+  "desc": "AGL ENERGY",
+  "debit": 83,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-12",
+  "desc": "BUNNINGS 7788 PENRITH AUS",
+  "debit": 90.3,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-13",
+  "desc": "NETFLIX.COM",
+  "debit": 97.6,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-14",
+  "desc": "CHEMIST WAREHOUSE 14 SYDNEY AUS",
+  "debit": 14.9,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-15",
+  "desc": "ALDI STORES 88 AUS",
+  "debit": 22.2,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-16",
+  "desc": "BP 5566 PARRAMATTA AUS",
+  "debit": 29.5,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-17",
+  "desc": "WOOLWORTHS 1234 SYDNEY AUS",
+  "debit": 36.8,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-18",
+  "desc": "STARBUCKS 22 NEWTOWN AUS",
+  "debit": 44.1,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-19",
+  "desc": "AGL ENERGY",
+  "debit": 51.4,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-20",
+  "desc": "BUNNINGS 7788 PENRITH AUS",
+  "debit": 58.7,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-21",
+  "desc": "NETFLIX.COM",
+  "debit": 66,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-22",
+  "desc": "CHEMIST WAREHOUSE 14 SYDNEY AUS",
+  "debit": 73.3,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-23",
+  "desc": "ALDI STORES 88 AUS",
+  "debit": 80.6,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-24",
+  "desc": "BP 5566 PARRAMATTA AUS",
+  "debit": 87.9,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-25",
+  "desc": "WOOLWORTHS 1234 SYDNEY AUS",
+  "debit": 95.2,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-26",
+  "desc": "STARBUCKS 22 NEWTOWN AUS",
+  "debit": 12.5,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-27",
+  "desc": "AGL ENERGY",
+  "debit": 19.8,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-28",
+  "desc": "BUNNINGS 7788 PENRITH AUS",
+  "debit": 27.1,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-01",
+  "desc": "NETFLIX.COM",
+  "debit": 34.4,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-02",
+  "desc": "CHEMIST WAREHOUSE 14 SYDNEY AUS",
+  "debit": 41.7,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-03",
+  "desc": "ALDI STORES 88 AUS",
+  "debit": 49,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-04",
+  "desc": "BP 5566 PARRAMATTA AUS",
+  "debit": 56.3,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-05",
+  "desc": "WOOLWORTHS 1234 SYDNEY AUS",
+  "debit": 63.6,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-06",
+  "desc": "STARBUCKS 22 NEWTOWN AUS",
+  "debit": 70.9,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-07",
+  "desc": "AGL ENERGY",
+  "debit": 78.2,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-08",
+  "desc": "BUNNINGS 7788 PENRITH AUS",
+  "debit": 85.5,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-09",
+  "desc": "NETFLIX.COM",
+  "debit": 92.8,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-10",
+  "desc": "CHEMIST WAREHOUSE 14 SYDNEY AUS",
+  "debit": 10.1,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-11",
+  "desc": "ALDI STORES 88 AUS",
+  "debit": 17.4,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-12",
+  "desc": "BP 5566 PARRAMATTA AUS",
+  "debit": 24.7,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-13",
+  "desc": "WOOLWORTHS 1234 SYDNEY AUS",
+  "debit": 32,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-14",
+  "desc": "STARBUCKS 22 NEWTOWN AUS",
+  "debit": 39.3,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-15",
+  "desc": "AGL ENERGY",
+  "debit": 46.6,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-16",
+  "desc": "BUNNINGS 7788 PENRITH AUS",
+  "debit": 53.9,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-17",
+  "desc": "NETFLIX.COM",
+  "debit": 61.2,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-18",
+  "desc": "CHEMIST WAREHOUSE 14 SYDNEY AUS",
+  "debit": 68.5,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-19",
+  "desc": "ALDI STORES 88 AUS",
+  "debit": 75.8,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-20",
+  "desc": "BP 5566 PARRAMATTA AUS",
+  "debit": 83.1,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-21",
+  "desc": "WOOLWORTHS 1234 SYDNEY AUS",
+  "debit": 90.4,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-22",
+  "desc": "STARBUCKS 22 NEWTOWN AUS",
+  "debit": 97.7,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-23",
+  "desc": "AGL ENERGY",
+  "debit": 15,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-24",
+  "desc": "BUNNINGS 7788 PENRITH AUS",
+  "debit": 22.3,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-25",
+  "desc": "NETFLIX.COM",
+  "debit": 29.6,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-26",
+  "desc": "CHEMIST WAREHOUSE 14 SYDNEY AUS",
+  "debit": 36.9,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-27",
+  "desc": "ALDI STORES 88 AUS",
+  "debit": 44.2,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-28",
+  "desc": "BP 5566 PARRAMATTA AUS",
+  "debit": 51.5,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-01",
+  "desc": "WOOLWORTHS 1234 SYDNEY AUS",
+  "debit": 58.8,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-02",
+  "desc": "STARBUCKS 22 NEWTOWN AUS",
+  "debit": 66.1,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-03",
+  "desc": "AGL ENERGY",
+  "debit": 73.4,
+  "credit": 0
+ },
+ {
+  "date": "2026-05-04",
+  "desc": "BUNNINGS 7788 PENRITH AUS",
+  "debit": 80.7,
+  "credit": 0
+ }
+]

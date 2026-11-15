@@ -90,6 +90,9 @@ var ambiguousPhrases = map[string]bool{"shell": true, "target": true, "stan": tr
 	"ando": true, "belong": true, "steam": true, "stake": true, "catch": true, "mate": true, "bunnings": false}
 
 func phraseConf(p string, glued bool) int {
+	if c, ok := lowConfPhrases[p]; ok {
+		return c
+	}
 	c := 85
 	switch {
 	case genericPhrases[p]:
@@ -222,8 +225,9 @@ func (h *history) guess(toks []string, amount float64) (string, int, bool) {
 	switch {
 	case exact:
 		return bestCat, min(70, bestConf), true
-	case bestSim >= 0.6:
-		return bestCat, min(55, 25+int(40*bestSim)), true
+	case bestSim >= 0.7:
+		// A look-alike is only a guess: keep it in the "low" band (under 50) so it is easy to review.
+		return bestCat, min(45, 25+int(20*bestSim)), true
 	}
 	return "", 0, false
 }
@@ -279,7 +283,13 @@ func (c *classifier) classifyBase(name, merchant, hint string, amount float64) r
 	if lok && strong {
 		return result{lcat, "learned", 90, false} // you categorised this merchant before: beats the built-in list
 	}
-	text := norm(name + " " + merchant)
+	text := norm(cleanText(name + " " + merchant)) // how it was paid is not who was paid
+	if amount > 0 && reAirTicket.MatchString(text) {
+		return result{"Travel & Holidays", "builtin", 85, false} // airline ticket number
+	}
+	if amount > 0 && reTollRef.MatchString(text) {
+		return result{"Transport & Fuel", "builtin", 85, false} // toll account reference, e.g. ETOLL4489362794
+	}
 	if cat, phrase, glued, ok := dictLookup(text, amount); ok {
 		return result{cat, "builtin", phraseConf(phrase, glued), false}
 	}
@@ -303,6 +313,9 @@ func (c *classifier) classifyBase(name, merchant, hint string, amount float64) r
 	if cat, ok := fuzzyBrand(toks, amount); ok {
 		return result{cat, "fuzzy", 52, false}
 	}
+	if cat, ok := suffixGuess(toks); ok {
+		return result{cat, "fuzzy", 50, false} // a run-together name ending in a business word, e.g. "primemeat"
+	}
 	if cat, conf, ok := c.hist.guess(toks, amount); ok {
 		return result{cat, "history", conf, false}
 	}
@@ -316,4 +329,31 @@ func (c *classifier) classifyBase(name, merchant, hint string, amount float64) r
 func (c *classifier) classify(name, merchant, hint string, amount float64) (string, string) {
 	r := c.classifyFull(name, merchant, hint, amount)
 	return r.Cat, r.Src
+}
+
+// An airline name immediately followed by a long ticket number, e.g. "UNITED1621150119831".
+var reAirTicket = regexp.MustCompile(`\b(united|delta|american|qantas|jetstar|virgin|emirates|qatar|etihad|singapore|cathay|lufthansa|british|airnz|air ?canada|fiji|rex|tigerair|scoot)\d{9,}\b`)
+
+// A toll account reference: the operator's name run together with the account number.
+var reTollRef = regexp.MustCompile(`\b(etoll|linkt|etag)\d{6,}\b`)
+
+// Names that run a business word onto the end ("primemeat", "chargrillcafe"): the ending says
+// what kind of business it is. Only a guess, so it scores in the medium band.
+var suffixCats = []struct{ suf, cat string }{
+	{"meats", "Groceries"}, {"meat", "Groceries"}, {"seafood", "Groceries"},
+	{"bakery", "Dining & Takeaway"}, {"pizza", "Dining & Takeaway"}, {"burger", "Dining & Takeaway"}, {"kebab", "Dining & Takeaway"},
+	{"sushi", "Dining & Takeaway"}, {"noodles", "Dining & Takeaway"}, {"coffee", "Dining & Takeaway"}, {"cafe", "Dining & Takeaway"},
+	{"pharmacy", "Health & Medical"}, {"chemist", "Health & Medical"}, {"physio", "Health & Medical"}, {"dental", "Health & Medical"},
+	{"cellars", "Alcohol & Tobacco"}, {"liquor", "Alcohol & Tobacco"},
+}
+
+func suffixGuess(toks []string) (string, bool) {
+	for _, t := range toks {
+		for _, s := range suffixCats {
+			if len(t) >= len(s.suf)+5 && strings.HasSuffix(t, s.suf) {
+				return s.cat, true
+			}
+		}
+	}
+	return "", false
 }

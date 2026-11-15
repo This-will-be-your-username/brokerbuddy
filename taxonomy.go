@@ -93,21 +93,26 @@ type dictEntry struct {
 
 var dict = func() []dictEntry {
 	var out []dictEntry
-	for cat, s := range dictSrc {
-		for _, p := range strings.Split(s, "|") {
-			p = norm(p)
-			if p == "" {
-				continue
+	for _, src := range []map[string]string{dictSrc, dictMore} {
+		for cat, s := range src {
+			for _, p := range strings.Split(s, "|") {
+				p = norm(p)
+				if p == "" {
+					continue
+				}
+				out = append(out, dictEntry{p, strings.ReplaceAll(p, " ", ""), cat, strings.Count(p, " ") + 1})
 			}
-			out = append(out, dictEntry{p, strings.ReplaceAll(p, " ", ""), cat, strings.Count(p, " ") + 1})
 		}
 	}
-	// deterministic: longest first, then alphabetical
+	// deterministic: longest first, then alphabetical, then by category
 	sort.Slice(out, func(i, j int) bool {
 		if len(out[i].pat) != len(out[j].pat) {
 			return len(out[i].pat) > len(out[j].pat)
 		}
-		return out[i].pat < out[j].pat
+		if out[i].pat != out[j].pat {
+			return out[i].pat < out[j].pat
+		}
+		return out[i].cat < out[j].cat
 	})
 	return out
 }()
@@ -155,12 +160,15 @@ var stopTokens = map[string]bool{
 	"nsw": true, "vic": true, "qld": true, "wa": true, "sa": true, "tas": true, "act": true, "nt": true,
 	"aus": true, "aud": true, "to": true, "from": true, "the": true, "of": true, "and": true, "in": true,
 	"online": true, "internet": true, "withdrawal": true, "au": true, "ref": true, "no": true, "pay": true,
+	// payment-processor prefixes (Square, Shopify/Stripe, Zeller, Lightspeed, ...) and statement furniture
+	"sp": true, "smp": true, "lsp": true, "zlr": true, "tst": true, "ls": true, "ezypay": true, "ezidebit": true,
+	"foreign": true, "curr": true, "currency": true, "copyright": true, "westpac": true, "banking": true, "corporation": true, "abn": true,
 }
 
 // merchantKey reduces a bank narrative to the 1-2 words that identify the business.
 func merchantKey(desc string) string {
 	var keep []string
-	for _, tok := range strings.Fields(norm(desc)) {
+	for _, tok := range strings.Fields(norm(cleanText(desc))) {
 		if stopTokens[tok] || len(tok) < 3 || strings.ContainsAny(tok, "0123456789") {
 			continue
 		}

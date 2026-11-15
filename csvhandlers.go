@@ -310,7 +310,11 @@ func (a *app) importRun(w http.ResponseWriter, r *http.Request) {
 	levels := map[string]int{} // confidence of the transactions actually added
 	skippedCard := 0           // card repayments that are ignored
 	reimbN := 0                // repayments from other people that were flagged
+	dc := newDupCheck(tx, acct)
 	for i, t := range txns {
+		if dc.seen(ids[i], t.Date, t.Amount, t.Desc) {
+			continue // already imported under an older description: not a new transaction
+		}
 		cr := cl.classifyFull(t.Desc, "", t.Cat, t.Amount)
 		res, err := tx.Exec(`INSERT INTO transactions(plaid_txn_id,account_id,date,name,merchant,amount,plaid_category,category,cat_source,confidence,reimb)
 			VALUES(?,?,?,?,'',?,?,?,?,?,?) ON CONFLICT(plaid_txn_id) DO NOTHING`,

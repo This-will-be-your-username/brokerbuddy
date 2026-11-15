@@ -62,6 +62,8 @@ Classification order: your rules, then a built-in dictionary of AU merchants and
 
 **Unknown merchants:** click *Look up unknown merchants*. It sends only cleaned business names (e.g. `bunnings`) to Wikipedia's free API, 12 per click, biggest spend first. Results are marked *lookup* on the Transactions tab, listed under Settings → Categorisation, and can be rejected. Wikipedia knows chains, not local shops: for those, set the category once and tick *rule*.
 
+**Noise and built-in rules.** Before matching, wording about how a payment was made (`- Visa Purchase`, `- Direct Debit`, `Receipt 123`, foreign-currency notes, PDF page footers, and the merchant before a `CRED VOUCHER` marker) is ignored, so one shop looks the same however it was paid; stored descriptions are untouched. Footer text that older imports glued onto names is removed at startup, and re-importing a statement recognises rows stored under the older wording instead of duplicating them. The built-in dictionary also covers generic business words (butcher, patisserie, physiotherapy, cellars, swim school…), national brands (health funds, ISPs, airlines, hotel chains) and billing platforms (Ezypay, Spriggy). Local shops are deliberately not listed: set the category once, and every transaction from that merchant follows. Look-alike guesses from history are always shown as low confidence, and PayPal is a medium guess because it could be anything.
+
 **Lender view** (`/report`): 3/6/12-month averages by group and category, % of income, surplus, and a list of things an assessor may notice. CSV download included. It is a preparation aid, not a serviceability calculation.
 
 ## Tabs

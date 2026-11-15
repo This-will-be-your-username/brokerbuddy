@@ -67,6 +67,11 @@ func newApp(dbPath string) (*app, error) {
 	}
 	a := &app{db: db, vault: v, tpl: parseTemplates(), dbPath: dbPath, keyPath: keyPath, sess: newSessionStore(), limiter: newLoginLimiter()}
 	a.reloadPlaid()
+	if n, err := cleanStoredNames(db); err != nil {
+		log.Println("clean names:", err)
+	} else if n > 0 {
+		log.Printf("removed page-footer text from %d stored descriptions", n)
+	}
 	if err := recategorizeAll(db); err != nil { // move existing data onto the current category set
 		log.Println("recategorize:", err)
 	}

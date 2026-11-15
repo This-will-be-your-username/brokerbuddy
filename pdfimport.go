@@ -641,6 +641,18 @@ func parsePDFStatement(data []byte, password string) (*pdfResult, error) {
 		d, isDate := peelDate(first.text)
 		isDate = isDate && math.Abs(first.x0-dateX0) <= 2*fs+8
 
+		// Page furniture (legal footer, page numbers, web addresses, small print) is not part of any
+		// transaction. Without this it was appended to the description of the last row on each page.
+		if !isDate {
+			var all []string
+			for _, s := range ln.span {
+				all = append(all, s.text)
+			}
+			if footerRe.MatchString(strings.Join(all, " ")) || (ln.fs > 0 && ln.fs < 0.8*fs) {
+				continue
+			}
+		}
+
 		var amts = map[role]string{}
 		var text []string
 		for si, s := range ln.span {

@@ -30,7 +30,7 @@ var stateCodes = map[string]bool{"nsw": true, "vic": true, "qld": true, "wa": tr
 // descriptorTokens extracts the identifying words of a bank narrative.
 func descriptorTokens(s string) []string {
 	var kept []string
-	for _, t := range strings.Fields(norm(s)) {
+	for _, t := range strings.Fields(norm(cleanText(s))) {
 		if stateCodes[t] { // "... NEWTOWN NSW": state ends the descriptor; the word before it is the suburb
 			if len(kept) >= 2 {
 				kept = kept[:len(kept)-1]

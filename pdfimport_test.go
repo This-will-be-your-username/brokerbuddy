@@ -271,3 +271,29 @@ func TestPDFScannedImageIsRejectedClearly(t *testing.T) {
 		t.Errorf("want the no-text error, got %v", err)
 	}
 }
+
+// Page footers (legal small print) must not be glued onto the last transaction of a page.
+func TestPDFFooterIsNotPartOfAnyTransaction(t *testing.T) {
+	data, exp := loadFixture(t, "footer_j")
+	res, err := parsePDFStatement(data, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Pages < 2 {
+		t.Fatalf("the fixture should span pages: %d", res.Pages)
+	}
+	if len(res.Rows) != len(exp) {
+		t.Fatalf("rows %d want %d", len(res.Rows), len(exp))
+	}
+	for _, r := range res.Rows {
+		low := strings.ToLower(r[1])
+		for _, bad := range []string{"copyright", "banking corporation", "abn", "afsl", "www.", "terms and conditions", "©"} {
+			if strings.Contains(low, bad) {
+				t.Errorf("footer text leaked into a description: %q", r[1])
+			}
+		}
+	}
+	if !sameMultiset(rowsToOut(t, res), keys(exp, false)) {
+		t.Error("transactions differ from the fixture")
+	}
+}

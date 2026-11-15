@@ -31,12 +31,12 @@ func TestConfidenceLadder(t *testing.T) {
 	}{
 		{"MYCORP PAY", "", -3000, "Salary & Wages", "rule", 95, 95, "high"},
 		{"EFTPOS WOOLWORTHS METRO 12 SYDNEY", "", 40, "Groceries", "builtin", 85, 90, "high"},
-		{"THE LITTLE CAFE", "", 9, "Dining & Takeaway", "builtin", 60, 70, "medium"},           // an ordinary word, less certain than a brand
-		{"BP 5566 PARRAMATTA", "", 70, "Transport & Fuel", "builtin", 70, 75, "medium"},        // very short phrase
-		{"EFTPOS WOOLWORHTS CITY", "", 40, "Groceries", "fuzzy", 50, 55, "medium"},             // typo of a known brand
-		{"ZORBAS TAVERNA KINGSFORD", "", 40, "Dining & Takeaway", "history", 40, 55, "medium"}, // look-alike of something in history
-		{"ZORBAS TAVERNA", "", 40, "Dining & Takeaway", "history", 70, 70, "medium"},           // identical name in history
-		{"SOMETHING ODD", "ENTERTAINMENT", 20, "Entertainment", "hint", 50, 55, "medium"},      // the bank's own category
+		{"THE LITTLE CAFE", "", 9, "Dining & Takeaway", "builtin", 60, 70, "medium"},        // an ordinary word, less certain than a brand
+		{"BP 5566 PARRAMATTA", "", 70, "Transport & Fuel", "builtin", 70, 75, "medium"},     // very short phrase
+		{"EFTPOS WOOLWORHTS CITY", "", 40, "Groceries", "fuzzy", 50, 55, "medium"},          // typo of a known brand
+		{"ZORBAS TAVERNA KINGSFORD", "", 40, "Dining & Takeaway", "history", 40, 45, "low"}, // a look-alike is only a guess: kept in the low band
+		{"ZORBAS TAVERNA", "", 40, "Dining & Takeaway", "history", 70, 70, "medium"},        // identical name in history
+		{"SOMETHING ODD", "ENTERTAINMENT", 20, "Entertainment", "hint", 50, 55, "medium"},   // the bank's own category
 		{"MONTHLY ACCOUNT SERVICING CHARGE", "", 12, "Fees & Dishonours", "cue", 40, 40, "low"},
 		{"MYSTERY DEPOSIT 99", "", -250, "Other Income", "cue", 20, 20, "low"}, // money in, no other clue
 		{"QWZX PLORB", "", 30, "Uncategorized", "", 0, 0, "unknown"},           // nothing to go on, but still attempted
