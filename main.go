@@ -15,6 +15,9 @@ import (
 	"time"
 )
 
+// version is set at build time: go build -ldflags "-X main.version=v1.2.3"
+var version = "dev"
+
 //go:embed static
 var staticFS embed.FS
 
@@ -40,8 +43,13 @@ func main() {
 	// The only startup options. Everything else is configured in the web interface (Settings).
 	dbPath := flag.String("db", "brokerbuddy.db", "path to the SQLite database file")
 	addr := flag.String("addr", "127.0.0.1:8443", "local address for the web interface")
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	demo := flag.Bool("demo", false, "fill an empty database with a year of fictional demo transactions (use with -db demo.db)")
 	flag.Parse()
+	if *showVersion {
+		fmt.Println("BrokerBuddy", version)
+		return
+	}
 
 	a, err := newApp(*dbPath)
 	if err != nil {

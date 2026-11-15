@@ -1,12 +1,10 @@
 # Getting started
 
-## Requirements
+## Install
 
-- A recent [Go](https://go.dev/dl/) toolchain (the exact version is in `go.mod`).
-- A modern browser.
-- Optional: Edge or Chrome and Node.js, only for regenerating test PDFs and screenshots ([development](Development-and-Testing)).
+The quickest way is a download for your platform from the repository's **Releases** page (Windows, macOS and Linux, Intel and ARM), or the Docker image. Step by step instructions for each are in [Installing and running](Installing-and-Running).
 
-The app is a single Go program with an embedded web interface. It uses a pure Go SQLite driver, so no C compiler or database server is needed.
+From source you need a recent [Go](https://go.dev/dl/) toolchain (the version is in `go.mod`) and a modern browser. The program is self-contained and uses a pure Go SQLite driver, so no C compiler or database server is needed.
 
 ## Run it
 
@@ -14,11 +12,10 @@ The app is a single Go program with an embedded web interface. It uses a pure Go
 go run .
 ```
 
-or build once and run the binary:
+or, with a downloaded release, run `brokerbuddy` (`brokerbuddy.exe` on Windows). With Docker:
 
 ```
-go build -o brokerbuddy .
-./brokerbuddy
+docker run -d -p 127.0.0.1:8443:8443 -v brokerbuddy-data:/data ghcr.io/<owner>/brokerbuddy:latest
 ```
 
 Open **https://127.0.0.1:8443**. The certificate is self-signed and generated once, so your browser warns you the first time. Accept it once; it is kept between runs.
@@ -32,6 +29,7 @@ Everything else is configured in the web interface (**Settings**). There are no 
 | `-db` | `brokerbuddy.db` | Path of the SQLite database |
 | `-addr` | `127.0.0.1:8443` | Local address of the web interface |
 | `-demo` | off | Fill an empty database with fictional [demo data](Demo-Data) |
+| `-version` | | Print the version and exit |
 
 ## Your data files
 

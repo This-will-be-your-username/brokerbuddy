@@ -1,0 +1,13 @@
+.git
+.github
+*.db
+*.db-*
+*.key
+*.pem
+*.exe
+brokerbuddy
+wiki
+scripts
+testdata
+.env
+.env.*

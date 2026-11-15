@@ -1,6 +1,7 @@
 **BrokerBuddy**
 
 - [Home](Home)
+- [Installing and running](Installing-and-Running)
 - [Getting started](Getting-Started)
 - [Demo data](Demo-Data)
 - [Importing data](Importing-Data)
@@ -13,4 +14,5 @@
 - [Privacy](Privacy)
 - [Architecture](Architecture)
 - [Development and testing](Development-and-Testing)
+- [Releases and CI](Releases-and-CI)
 - [FAQ and troubleshooting](FAQ-and-Troubleshooting)

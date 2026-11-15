@@ -19,11 +19,19 @@ Your data stays on your computer, in one SQLite file. There are no paid services
 
 ## Quick start
 
-You need a recent [Go](https://go.dev/dl/) (the version is in `go.mod`).
+**Download** a build for Windows, macOS or Linux (Intel or ARM) from the [Releases](https://github.com/This-will-be-your-username/brokerbuddy/releases) page, run it, and open **https://127.0.0.1:8443**. Or use Docker:
+
+```
+docker run -d -p 127.0.0.1:8443:8443 -v brokerbuddy-data:/data ghcr.io/this-will-be-your-username/brokerbuddy:latest
+```
+
+Or run from source with a recent [Go](https://go.dev/dl/) (the version is in `go.mod`):
 
 ```
 go run .
 ```
+
+Step by step guides for each platform are in [Installing and running](wiki/Installing-and-Running.md).
 
 Open **https://127.0.0.1:8443** (accept the self-signed certificate warning once) and go to **Settings**.
 
@@ -38,6 +46,7 @@ go run . -db demo.db -demo
 | `-db` | `brokerbuddy.db` | where your data lives |
 | `-addr` | `127.0.0.1:8443` | local address for the web UI |
 | `-demo` | off | fill an empty database with a year of fictional transactions |
+| `-version` | | print the version and exit |
 
 On first run an encryption key is created next to the database (`brokerbuddy.db.key`). **Back up both files together.**
 
@@ -54,6 +63,7 @@ More are in the wiki, all taken with the built-in demo data.
 
 Full documentation lives in the **[repository wiki](https://github.com/This-will-be-your-username/brokerbuddy/wiki)**:
 
+- [Installing and running](wiki/Installing-and-Running.md): downloads for Windows, macOS and Linux, Docker, services
 - [Getting started](wiki/Getting-Started.md) and [demo data](wiki/Demo-Data.md)
 - [Importing data](wiki/Importing-Data.md): CSV, PDF and Plaid
 - [Categorisation](wiki/Categorisation.md): how transactions are classified, confidence scores, rules, learning, suggestions, reprocessing
@@ -63,7 +73,7 @@ Full documentation lives in the **[repository wiki](https://github.com/This-will
 - [Mortgage planner](wiki/Mortgage-Planner.md)
 - [Settings, security and HTTPS](wiki/Settings-and-Security.md)
 - [Privacy](wiki/Privacy.md)
-- [Architecture](wiki/Architecture.md) and [development and testing](wiki/Development-and-Testing.md)
+- [Architecture](wiki/Architecture.md), [development and testing](wiki/Development-and-Testing.md) and [releases and CI](wiki/Releases-and-CI.md)
 - [FAQ and troubleshooting](wiki/FAQ-and-Troubleshooting.md)
 
 The wiki pages are also kept in this repository under [`wiki/`](wiki/), so they are versioned with the code. See [publishing the wiki](scripts/publish-wiki.sh) to push them to the GitHub wiki.

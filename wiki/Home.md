@@ -17,6 +17,7 @@ Everything below was captured with the built-in [demo data](Demo-Data): fictiona
 | Repayments from others | Small credits from friends offset the spending they relate to | [Transactions](Transactions#repayments-from-other-people) |
 | Analysis | Dashboard, seven chart views, a lender summary | [Dashboard, charts, lender view](Dashboard-Charts-and-Lender-View) |
 | Mortgage | Borrowing capacity, stamp duty, market rates, spending sliders | [Mortgage planner](Mortgage-Planner) |
+| Running it | Downloads for Windows, macOS and Linux, Docker images, running as a service | [Installing and running](Installing-and-Running) |
 | Security | Encrypted secrets, password login, HTTPS options | [Settings and security](Settings-and-Security) |
 
 ## Dark mode
@@ -33,10 +34,11 @@ The layout adapts to narrow screens.
 
 ## Start here
 
-1. [Getting started](Getting-Started): run it and open it in a browser.
-2. [Demo data](Demo-Data): look around without any real data.
-3. [Importing data](Importing-Data): bring in your own statements.
-4. [Categorisation](Categorisation): understand and correct the results.
+1. [Installing and running](Installing-and-Running): Windows, macOS, Linux or Docker.
+2. [Getting started](Getting-Started): first steps.
+3. [Demo data](Demo-Data): look around without any real data.
+4. [Importing data](Importing-Data): bring in your own statements.
+5. [Categorisation](Categorisation): understand and correct the results.
 
 ## Important limits
 
