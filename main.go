@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strings"
 	"sync/atomic"
+	"time"
 )
 
 //go:embed static
@@ -39,11 +40,19 @@ func main() {
 	// The only startup options. Everything else is configured in the web interface (Settings).
 	dbPath := flag.String("db", "brokerbuddy.db", "path to the SQLite database file")
 	addr := flag.String("addr", "127.0.0.1:8443", "local address for the web interface")
+	demo := flag.Bool("demo", false, "fill an empty database with a year of fictional demo transactions (use with -db demo.db)")
 	flag.Parse()
 
 	a, err := newApp(*dbPath)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if *demo {
+		if n, err := loadDemo(a.db, time.Now()); err != nil {
+			log.Fatal(err)
+		} else {
+			log.Printf("loaded %d fictional demo transactions into %s", n, *dbPath)
+		}
 	}
 	a.net = newNetManager(a, a.routes(), *addr)
 	a.net.Start()
@@ -112,6 +121,8 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("POST /rules/delete", a.deleteRule)
 	mux.HandleFunc("POST /items/delete", a.deleteItem)
 	mux.HandleFunc("POST /lookup", a.lookupUnknown)
+	mux.HandleFunc("POST /demo/load", a.demoLoad)
+	mux.HandleFunc("POST /demo/remove", a.demoRemove)
 	mux.HandleFunc("POST /api/suggest", a.suggestPage)
 	mux.HandleFunc("POST /lookup/delete", a.lookupDelete)
 	mux.HandleFunc("POST /recategorize", a.recategorize)

@@ -143,6 +143,13 @@ section.card{scroll-margin-top:12px}
   </div>
 </section>
 
+<section class="card" id="demo">
+  <h2>Demo data</h2>
+  <p class="mut small">A year of fictional transactions for trying the app, testing, or taking screenshots, with no real bank data involved. It is kept in its own accounts and never mixed into your own: loading is only possible while you have no transactions of your own. To keep your real data safe, run a separate copy with <code>brokerbuddy -db demo.db -demo</code>.</p>
+  {{if .DemoLoaded}}<form method="post" action="/demo/remove" class="row"><button class="danger">Remove demo data</button><span class="mut small">Demo data is loaded. Removing it deletes only the demo accounts and their transactions.</span></form>
+  {{else}}<form method="post" action="/demo/load"><button>Load demo data</button></form>{{end}}
+</section>
+
 <section class="card" id="security">
   <h2>Password</h2>
   {{if .HasPassword}}<p class="mut small">A password is set. You can change it below.</p>

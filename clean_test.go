@@ -36,10 +36,10 @@ func TestSameShopLooksTheSameHoweverItWasPaid(t *testing.T) {
 func TestProcessorPrefixesAreNotThePayee(t *testing.T) {
 	for in, want := range map[string][]string{
 		"ZLR*Deli Hub - St. Sub Suburbton AUS": {"deli", "hub"},
-		"SQ *CLAY GREEN BAKE Suburbton":  {"clay", "green", "bake"},
-		"SMP*Henris Patisserie Suburbton":  {"henris", "patisserie"},
+		"SQ *CLAY GREEN BAKE Suburbton":        {"clay", "green", "bake"},
+		"SMP*Henris Patisserie Suburbton":      {"henris", "patisserie"},
 		"LSP*Mrs Smith the Bake Suburbton AUS": {"mrs", "smith", "bake"},
-		"Ezypay*Acme Fit Traini Sydney AUS":  {"acme", "fit", "traini"},
+		"Ezypay*Acme Fit Traini Sydney AUS":    {"acme", "fit", "traini"},
 	} {
 		got := descriptorTokens(in)
 		if len(got) > len(want) {

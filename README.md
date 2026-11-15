@@ -1,110 +1,76 @@
 # BrokerBuddy
 
-A private, self-hosted money dashboard. Import bank CSVs or PDF statements (or link a bank through Plaid), have transactions sorted into lender-style categories, see income and spending, and estimate how much you could borrow for a home.
+A private, self-hosted money dashboard for Australian households. Import bank CSVs or PDF statements (or link a bank through Plaid), have every transaction sorted into the categories a mortgage lender looks at, see where the money goes, and estimate how much you could borrow for a home.
 
-## Run
+Your data stays on your computer, in one SQLite file. There are no paid services and no accounts to create.
+
+![Dashboard](wiki/images/dashboard-light.png)
+
+## Highlights
+
+- **Import anything:** CSV with automatic column mapping, text-based PDF statements with automatic table detection, or optional Plaid linking.
+- **Lender-style categorisation:** about 30 categories grouped as Income, Essential, Discretionary, Debts, Risk flags and Neutral, with a confidence score on every transaction, learning from your corrections, and optional merchant lookups.
+- **Fix things quickly:** a review list of doubtful transactions, suggested categories with scores, one edit fixes every transaction from the same merchant.
+- **Credit cards and repayments:** card repayments are not double counted, and small credits from friends offset the spending they relate to.
+- **Dashboard, charts and a lender view** for income, spending and surplus.
+- **Mortgage planner:** borrowing capacity, stamp duty for every state, live market rates, and spending sliders that recalculate the price you could afford.
+- **Private and secure:** secrets encrypted at rest, password login, HTTPS (self-signed, Let's Encrypt or your own certificate), nothing personal ever sent to lookups.
+- **Light, dark and auto themes.** All configuration is in the web interface.
+
+## Quick start
+
+You need a recent [Go](https://go.dev/dl/) (the version is in `go.mod`).
 
 ```
 go run .
 ```
 
-Open **https://127.0.0.1:8443** (the certificate is self-signed, so accept the browser warning once; it is generated once and kept, so you won't be asked again). Then go to **Settings**.
+Open **https://127.0.0.1:8443** (accept the self-signed certificate warning once) and go to **Settings**.
 
-**Everything is configured in the web interface.** There are no environment variables. The only startup options are optional flags:
+To explore with fictional data and no real bank details, run a separate demo database:
+
+```
+go run . -db demo.db -demo
+```
 
 | Flag | Default | Meaning |
 |------|---------|---------|
 | `-db` | `brokerbuddy.db` | where your data lives |
 | `-addr` | `127.0.0.1:8443` | local address for the web UI |
+| `-demo` | off | fill an empty database with a year of fictional transactions |
 
-On first run an encryption key is generated next to the database (`brokerbuddy.db.key`). **Back up both files together**; without the key file, stored secrets (bank tokens, Plaid secret) can't be read.
+On first run an encryption key is created next to the database (`brokerbuddy.db.key`). **Back up both files together.**
 
-## Settings
+## Screenshots
 
-- **Banks:** optional Plaid keys (secret stored encrypted, never shown again), connected and imported accounts.
-- **Categorisation:** rules, merchant lookups, re-run categorisation.
-- **Security:** set a password. With no password the app answers only on this computer (it refuses other host names, which also blocks DNS-rebinding). Passwords are bcrypt-hashed, sign-in is rate limited, and cross-site form posts are rejected.
-- **Access & HTTPS:** choose *This computer only*, *Internet with a free Let's Encrypt certificate* (needs a domain and open ports 80/443), or *your own certificate*. Changes apply immediately without a restart, and the local address always stays available so a wrong setting can't lock you out. Anything beyond this computer requires a password.
+| | |
+|---|---|
+| ![Transactions](wiki/images/transactions.png) | ![Suggestions](wiki/images/suggestions.png) |
+| ![Charts](wiki/images/charts.png) | ![Mortgage](wiki/images/mortgage.png) |
 
-## Appearance
+More are in the wiki, all taken with the built-in demo data.
 
-Use the **Auto / Light / Dark** control in the top bar. Auto follows your system setting. The choice is remembered per browser.
+## Documentation
 
-## Importing PDF statements
+Full documentation lives in the **[repository wiki](https://github.com/This-will-be-your-username/brokerbuddy/wiki)**:
 
-Upload a PDF on the **Import** page; the transaction table is found automatically and shown in the same mapping and preview screen as a CSV before anything is saved.
+- [Getting started](wiki/Getting-Started.md) and [demo data](wiki/Demo-Data.md)
+- [Importing data](wiki/Importing-Data.md): CSV, PDF and Plaid
+- [Categorisation](wiki/Categorisation.md): how transactions are classified, confidence scores, rules, learning, suggestions, reprocessing
+- [Transactions](wiki/Transactions.md): filters, review, ignored rows, repayments from others, reversing direction
+- [Credit cards](wiki/Credit-Cards-and-Repayments.md)
+- [Dashboard, charts and lender view](wiki/Dashboard-Charts-and-Lender-View.md)
+- [Mortgage planner](wiki/Mortgage-Planner.md)
+- [Settings, security and HTTPS](wiki/Settings-and-Security.md)
+- [Privacy](wiki/Privacy.md)
+- [Architecture](wiki/Architecture.md) and [development and testing](wiki/Development-and-Testing.md)
+- [FAQ and troubleshooting](wiki/FAQ-and-Troubleshooting.md)
 
-How it works: text and positions are read from every page and rebuilt into lines and cells; the table is found from its header row (even when the headings wrap over several lines), or, with no header, from rows that start with a date and end in amounts; numeric columns are located by clustering the amounts' x positions and labelled from the header; wrapped descriptions are re-joined; a date shown once per day carries to the rows below; dates without a year take it from the statement period; and money in/out comes from Debit/Credit columns, `CR`/`DR` markers, or the running balance (statements may list newest first). Opening/closing balances, totals, footers and repeated headers are dropped.
+The wiki pages are also kept in this repository under [`wiki/`](wiki/), so they are versioned with the code. See [publishing the wiki](scripts/publish-wiki.sh) to push them to the GitHub wiki.
 
-Limits: text-based PDFs only (a scan or photo has no text and needs OCR, which isn't included); password-protected files need the password entered on the upload form (it is used once and not stored); PDF 2.0 files and statements that combine several accounts with different column layouts in one file may not read correctly. Always check the preview, and use the CSV export when your bank offers one. Re-importing a statement is safe: duplicates are skipped.
+## Limits
 
-## CSV import (no bank API needed)
-
-Click **Import CSV**, upload an export from any bank. The app skips preamble lines, sniffs the delimiter, finds the header row, and guesses the date, description, amount (or separate debit/credit) columns and the date format; fix anything wrong with the dropdowns and check the preview. Mappings are remembered per header layout, so the next export from the same bank is one click. Re-importing overlapping exports skips duplicates. Amounts with a decimal comma (`4,50`) are not supported.
-
-## Categories and the lender view
-
-Transactions are bucketed into ~30 categories grouped the way an Australian lender reads statements: Income, Essential living, Discretionary, Debts & commitments, Risk flags (gambling, cash withdrawals, dishonours/fees, short-term credit) and Neutral (transfers, savings).
-
-Classification order: your rules, then a built-in dictionary of AU merchants and bank phrases (longest phrase wins, whole words only, direction-aware so a salary credit is income but a debit is not), then cached online lookups, then the bank's own category.
-
-**Learning from your edits:** every category you set by hand becomes an example. Similar transactions (same business name, ignoring store numbers and suburbs, tolerating typos like `ZORBA`/`ZORBAS`) follow automatically and are marked *learned*. An example that fully matches beats the built-in dictionary; a brand-only match (e.g. you categorised `COLES EXPRESS`, a new one says `COLES`) is used only where the dictionary has no answer, and is skipped if your examples for that brand disagree. Your explicit rules still win over everything, and a debit is never learned as income.
-
-**Filtering transactions.** The Transactions page has a search box and a collapsed **Filters** menu (a badge shows how many filters are active). Open it to filter by account (one or several), category (one or several), group, money in/out, date range, amount range, confidence, how it was categorised (set by you, rule, learned, built-in list, lookup, bank, typo match, history, wording cue, not matched), and to choose the sort order. Active filters appear as removable pills under the search box, the confidence chips stay one click away, and the page shows how many transactions match with their money-out and money-in totals. Results are paged 200 at a time and paging keeps your filters. Every filter lives in the address, so a filtered view can be bookmarked. The table has an **Account** column; text that is too long for one line is collapsed with a chevron at the end, click it to expand.
-
-**Repayments from other people.** A small credit from another person (a friend paying you back for dinner, a parent for the kids' swimming) is not income: it should reduce spending in the category it relates to. Credits up to a size limit (default $300, set under Settings → Categorisation) with person-to-person wording ("OSKO PAYMENT FROM…", "TRANSFER FROM…", "PAYID FROM…") are flagged as *repaid by others*. Transfers between your own accounts or from a savings, loan or investment account, salary, benefits, interest and merchant refunds are never flagged. The category of a flagged credit is the spending it offsets: it is taken from your earlier choice for that payer, or from the memo (dinner → Dining & Takeaway, swimming lessons → Education & Childcare, petrol → Transport & Fuel, tickets → Entertainment, rent share → Rent, and so on); if there is no clue it is held out of both income and spending and listed under a banner so you can type the category it offsets. Once set, it nets against that category everywhere: dashboard, charts, lender view and mortgage analysis, and the Lender view says how much spending the repayments reduced. On any credit, **Repaid by others** flags it by hand and **Not a repayment** undoes an automatic flag (your choice sticks). Filters has a *Repayments from others* option (all, or only those needing a category), and the automatic detection and its size limit can be switched in Settings.
-
-**Credit cards.** Tick an account as a *credit card* (when importing, or under Settings → Banks → Credit cards; a card statement is recognised by lines such as "PAYMENT RECEIVED - THANK YOU", and Plaid marks credit accounts for you). Payments *into* the card are the same money as the payment from your other account, so counting both would double the spending and make the payments look like income. They are therefore **ignored**: the card's repayment lines, and (switchable in Settings) the matching "credit card repayment" payments from your other accounts, since the card's own purchases are counted instead. Refunds, rewards and interest on the card still count. Ignored transactions stay in the database, so re-importing doesn't bring them back, and they appear dimmed with the reason on the Transactions page when you choose *Show with the others* or *Only ignored* under Filters (the page says how many are hidden). Click **Count it** on any of them to include it anyway. They are left out of the dashboard, charts, lender view and mortgage analysis.
-
-**Confidence ratings.** Every categorisation gets a score from 0 to 100, shown on each transaction (hover for the reason) and in the import preview: *confirmed* (you set it), *high* (80+), *medium* (50-79), *low* (1-49) or *unknown* (nothing matched). The classifier always makes an attempt, working down: your rules (95) > a merchant you categorised before (90) > the built-in list (66-90; a brand scores higher than a word like "cafe") > the bank's own category (50-55) > an online lookup (50) > a typo of a known brand (52) > similarity to other transactions in your history (up to 55, or 70 for an identical name) > wording cues such as "fee" or unexplained money in (20-45). Only when none of that applies is it left Uncategorized with a score of 0. Guesses are never used as evidence for further guesses.
-
-**Fixing doubtful ones.** After an import you are taken straight to the *Needs review* list when anything is low or unknown. On Transactions, filter by confidence with the chips (each shows its count); the review list shows the least sure first with the same merchants together. Press ✓ to confirm a suggestion, or type a different category. Either way, the app then looks through your transaction history: other transactions from the same merchant (same name once store numbers, suburbs and states are ignored) take the category too, and anything close to it follows, unless you set it yourself. The page tells you how many were changed. If you categorised a merchant differently at different times, the most recent edit wins.
-
-**Unknown merchants:** click *Look up unknown merchants*. It sends only cleaned business names (e.g. `bunnings`) to Wikipedia's free API, 12 per click, biggest spend first. Results are marked *lookup* on the Transactions tab, listed under Settings → Categorisation, and can be rejected. Wikipedia knows chains, not local shops: for those, set the category once and tick *rule*.
-
-**Suggestions for doubtful transactions.** Rows that are unknown or low confidence have a *Suggest ▾* button. It opens a dropdown of likely categories, each with a likelihood score and the reason (hover or see the line below it), built from the app's best guess, what you chose for similar names, and your most-used categories. Pick one and press *Apply* (tick *rule* to remember it), or type your own category instead. *Search online* adds candidates from Wikipedia for that merchant; only the cleaned business name is sent, never amounts, dates or accounts, and answers are cached. Applying a category also updates other transactions from the same merchant.
-
-**Reprocess existing transactions** (Settings → Categorisation). After an update to the parsing or categorisation logic, *Preview changes* shows how many stored transactions would change (with before/after counts of unknown, low, medium and high confidence and a sample of the changes); *Apply changes* removes leftover footer text and re-categorises everything you have not confirmed yourself. Confirmed categories, rules, dates and amounts are never touched, and running it again changes nothing further. The app also does this automatically at startup.
-
-**Wrong direction.** If a bank export records money going out as a credit (or the reverse), use the *Make debit* / *Make credit* button under the amount on the Transactions list. The row is marked *reversed*, the categories, dashboard, charts and mortgage figures update, your hand-set categories are kept, and re-importing the same file or re-syncing does not undo or duplicate it. Press the button again to put it back.
-
-**Noise and built-in rules.** Before matching, wording about how a payment was made (`- Visa Purchase`, `- Direct Debit`, `Receipt 123`, foreign-currency notes, PDF page footers, and the merchant before a `CRED VOUCHER` marker) is ignored, so one shop looks the same however it was paid; stored descriptions are untouched. Footer text that older imports glued onto names is removed at startup, and re-importing a statement recognises rows stored under the older wording instead of duplicating them. The built-in dictionary also covers generic business words (butcher, patisserie, physiotherapy, cellars, swim school…), national brands (health funds, ISPs, airlines, hotel chains) and billing platforms (Ezypay, Spriggy). Local shops are deliberately not listed: set the category once, and every transaction from that merchant follows. Look-alike guesses from history are always shown as low confidence, and PayPal is a medium guess because it could be anything.
-
-**Lender view** (`/report`): 3/6/12-month averages by group and category, % of income, surplus, and a list of things an assessor may notice. CSV download included. It is a preparation aid, not a serviceability calculation.
-
-## Tabs
-
-- **Dashboard** (`/`): income, spending, surplus and savings rate for 1/3/6/12 months or all time, monthly income-vs-expenses chart, top spending categories, recent transactions.
-- **Transactions** (`/transactions`): the full list with search, category filter and inline category editing.
-- **Charts** (`/charts`): filter by period, accounts, groups, categories, income/spending, search text, and day/week/month grouping. Seven views: income vs spending, stacked spending by category, category share (click a slice to filter), group split, top merchants, cumulative net, spending by weekday, plus the largest transactions. Filtering happens in the browser, so it is instant.
-- **Mortgage** (`/mortgage`): see below.
-- **Lender view** (`/report`), **Import** (`/import`) and **Settings** (`/settings`).
-
-## Mortgage tab
-
-1. Enter your deposit, state, buyer type (owner-occupier, first home buyer, investor), term, and either type a rate or pick one from the market list.
-2. **Borrowing capacity** = your average monthly surplus (income minus spending from your transactions) that can service a loan at *rate + stress buffer* (default +3 points, like lenders use). Current rent is removed by default, since it stops when you buy. Existing loans, credit cards and BNPL stay in as spending.
-3. **Purchase price** solves `price + stamp duty + other costs = deposit + loan`, with the loan capped by your maximum LVR.
-4. **Ignore the current month** (tickbox): leaves this calendar month out of the income and spending averages, because it is only partly complete. The analysed window then ends at the last transaction before it. The choice is remembered.
-5. **Sliders** change each spending category from -100% to +100% in 1% steps; the price recalculates as you drag.
-
-**Rates.** *Search for current rates* downloads every home-loan rate that Australian banks, credit unions and building societies publish under the Consumer Data Right (free, no key; about 90 lenders, ~8,000 rates, ~1 minute). Staff, veteran, green-loan and other special-eligibility products and rate outliers are hidden unless you tick the box. Mortgage brokers don't publish a feed, so they can't be listed; they place loans with these same lenders.
-
-**Stamp duty** schedules are built in for every state and territory, each with a status note saying how well it was checked (NSW is official 2026/27; several concessions changed in 2026 and are flagged *verify*). You can always type your own duty figure from the state's official calculator. First-home-buyer concession bands marked approximate use straight-line phase-ins.
-
-**Not modelled:** lenders mortgage insurance, minimum living-expense benchmarks (HEM), income shading (e.g. 80% of rental income), HECS and credit-card limits. Treat the result as a planning aid.
-
-## How it works
-
-- Plaid Link (browser) → public token → server exchanges for an access token, stored AES-GCM encrypted in SQLite.
-- `/transactions/sync` (cursor-based) pulls added/modified/removed transactions atomically.
-- Categorisation priority is described above; manual edits survive re-syncs.
-
-## Security notes
-
-- Single-user app. See Settings → Security above for how access is controlled.
-- Secrets in the database (bank access tokens, Plaid secret, private keys) are AES-GCM encrypted with the key file.
-- Rate and merchant lookups send no personal data: only public rate requests, and cleaned business names for lookups you trigger.
+BrokerBuddy is a planning aid, not financial advice and not a lender's serviceability calculation. Lenders apply their own living-expense benchmarks, income shading and credit checks. PDF import supports text-based statements only (no OCR). Tax, investments and budgets are out of scope.
 
 ## Test
 

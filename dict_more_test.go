@@ -18,7 +18,7 @@ func TestNewRulesCategoriseCommonUnknowns(t *testing.T) {
 		{"gu health rewards GR SUBURBTON AUS", 160, "Insurance", 85},
 		{"LEAPTEL SUBURBTON AUS", 80, "Utilities & Internet", 85},
 		{"SPRIGGY SCHOOLS SYDNEY AUS", 45, "Education & Childcare", 85},
-		{"Small Animal Specialis Suburbton AUS", 900, "Pets", 85},
+		{"Small Animal Clinic Suburbton AUS", 900, "Pets", 85},
 		{"UNITED1621150119831 CONTINENTAL AUS", 1500, "Travel & Holidays", 80},
 		{"HIPCAMP BOOKING SOMEWHERE AUS", 300, "Travel & Holidays", 85},
 		{"AIRALO SINGAPORE SGP", 18, "Travel & Holidays", 85},

@@ -314,8 +314,8 @@ func (a *app) settingsPage(w http.ResponseWriter, r *http.Request) {
 		"PlaidClientID": a.getSetting("plaid_client_id"), "PlaidSecretSet": a.getSetting("plaid_secret") != "",
 		"PlaidEnv": env, "PlaidReady": a.pc() != nil,
 		"Items": items, "Manual": a.manualAccounts(), "Rules": rules, "Lookups": a.lookupList(), "Cats": allCategories(),
-		"HasPassword": a.hasPassword(),
-		"NetMode":     mode, "NetDomain": a.getSetting("net_domain"), "NetEmail": a.getSetting("net_email"), "NetAddr": addr,
+		"HasPassword": a.hasPassword(), "DemoLoaded": demoExists(a.db),
+		"NetMode": mode, "NetDomain": a.getSetting("net_domain"), "NetEmail": a.getSetting("net_email"), "NetAddr": addr,
 		"NetStaging": a.getSetting("net_staging") == "1", "CertSet": a.getSetting("net_cert") != "",
 		"Status": a.net.Status(), "LocalAddr": a.net.localAddr, "DBPath": a.dbPath, "KeyPath": a.keyPath,
 	})

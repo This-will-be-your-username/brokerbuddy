@@ -11,7 +11,9 @@
 {{template "nav" "dashboard"}}
 {{if .Flash}}<div class="card flash" role="status">{{.Flash}}</div>{{end}}
 {{if .Rep.Empty}}
-<div class="card"><h2>Welcome</h2><p>No transactions yet. <a href="/import">Import a CSV</a> from your bank, or connect a bank from the <a href="/transactions">Transactions</a> tab.</p></div>
+<div class="card"><h2>Welcome</h2><p>No transactions yet. <a href="/import">Import a CSV</a> from your bank, or connect a bank from the <a href="/transactions">Transactions</a> tab.</p>
+  <p class="mut small">Just looking around? Load a year of fictional demo transactions (made-up people, shops and amounts). You can remove them again under Settings.</p>
+  <form method="post" action="/demo/load"><button class="primary">Load demo data</button></form></div>
 {{else}}
 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
   <div class="mut">{{.Rep.From}} to {{.Rep.To}}</div>
