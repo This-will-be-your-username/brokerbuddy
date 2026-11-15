@@ -23,6 +23,7 @@ type repGroup struct {
 type repFlag struct{ Level, Text string }
 
 type report struct {
+	SkippedMonth                 bool // the current month was left out of the analysis
 	Months                       int
 	From, To                     string
 	SpanMonths                   float64
@@ -32,10 +33,20 @@ type report struct {
 	Empty                        bool
 }
 
-func (a *app) buildReport(months int) (*report, error) {
-	rep := &report{Months: months}
+func (a *app) buildReport(months int) (*report, error) { return a.buildReportOpt(months, false) }
+
+// buildReportOpt analyses the last `months` months of data. With skipCurrent, the current calendar
+// month (still in progress, so its income and spending are incomplete) is left out entirely and
+// the window ends at the last transaction before it.
+func (a *app) buildReportOpt(months int, skipCurrent bool) (*report, error) {
+	rep := &report{Months: months, SkippedMonth: skipCurrent}
 	var minS, maxS *string
-	if err := a.db.QueryRow(`SELECT MIN(date), MAX(date) FROM transactions`).Scan(&minS, &maxS); err != nil || maxS == nil {
+	q, args := `SELECT MIN(date), MAX(date) FROM transactions`, []any{}
+	if skipCurrent {
+		q += ` WHERE date < ?`
+		args = append(args, firstOfMonth(time.Now()).Format("2006-01-02"))
+	}
+	if err := a.db.QueryRow(q, args...).Scan(&minS, &maxS); err != nil || maxS == nil {
 		rep.Empty = true
 		return rep, err
 	}
@@ -182,4 +193,8 @@ func (a *app) reportCSV(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	cw.Flush()
+}
+
+func firstOfMonth(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, t.Location())
 }

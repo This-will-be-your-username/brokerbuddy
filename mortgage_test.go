@@ -1,8 +1,14 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
 	"math"
+	"net/http"
+	"strings"
 	"testing"
+	"time"
 )
 
 func near(t *testing.T, name string, got, want, tol float64) {
@@ -188,5 +194,123 @@ func TestSpecialAndMislabelledProducts(t *testing.T) {
 	rows := parseProductRates("B", "p", "Optimum 3 Year Fixed Rate Home Loan", "", false, []cdrLendingRate{{Type: "VARIABLE", Rate: "0.061"}})
 	if len(rows) != 1 || rows[0].Type != "FIXED" || rows[0].FixedMonths != 36 {
 		t.Errorf("%+v", rows)
+	}
+}
+
+func seedMonths(t *testing.T, a *app, currentMonthOnly bool) {
+	t.Helper()
+	a.db.Exec(`INSERT INTO accounts(plaid_account_id,item_id,name,type) VALUES('acct',NULL,'Test','manual')`)
+	add := func(id, date, name string, amt float64, cat string) {
+		if _, err := a.db.Exec(`INSERT INTO transactions(plaid_txn_id,account_id,date,name,amount,category) VALUES(?,?,?,?,?,?)`, id, "acct", date, name, amt, cat); err != nil {
+			t.Fatal(err)
+		}
+	}
+	now := time.Now()
+	first := firstOfMonth(now)
+	if !currentMonthOnly {
+		for i := 1; i <= 3; i++ {
+			m := first.AddDate(0, -i, 0)
+			add(fmt.Sprintf("s%d", i), m.Format("2006-01-02"), "SALARY", -5000, "Salary & Wages")
+			add(fmt.Sprintf("g%d", i), m.AddDate(0, 0, 14).Format("2006-01-02"), "WOOLWORTHS", 800, "Groceries")
+		}
+	}
+	// the in-progress month: a salary credit and a big one-off gambling spend that would distort the average
+	add("cs", first.Format("2006-01-02"), "SALARY", -5000, "Salary & Wages")
+	add("cg", first.Format("2006-01-02"), "SPORTSBET", 2500, "Gambling")
+}
+
+func TestIgnoreCurrentMonthLeavesItOutOfTheAnalysis(t *testing.T) {
+	a := testApp(t)
+	seedMonths(t, a, false)
+
+	with, err := a.buildReportOpt(6, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	without, err := a.buildReportOpt(6, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !without.SkippedMonth || with.SkippedMonth {
+		t.Error("SkippedMonth flag")
+	}
+	cutoff := firstOfMonth(time.Now()).Format("2006-01-02")
+	if without.To >= cutoff {
+		t.Errorf("window must end before the current month: %s >= %s", without.To, cutoff)
+	}
+	hasGambling := func(r *report) bool {
+		for _, g := range r.Groups {
+			for _, l := range g.Lines {
+				if l.Category == "Gambling" && l.Total > 0 {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	if !hasGambling(with) || hasGambling(without) {
+		t.Errorf("current-month gambling spend should appear only when the month is included (with=%v without=%v)", hasGambling(with), hasGambling(without))
+	}
+	if without.ExpensesM >= with.ExpensesM {
+		t.Errorf("ignoring the month should lower the spending average: %.0f vs %.0f", without.ExpensesM, with.ExpensesM)
+	}
+	// the mortgage baseline follows the same option
+	_, linesWith, _, _ := a.mortgageBaseline(6, false)
+	_, linesWithout, _, _ := a.mortgageBaseline(6, true)
+	has := func(ls []baseLine, c string) bool {
+		for _, l := range ls {
+			if l.Category == c {
+				return true
+			}
+		}
+		return false
+	}
+	if !has(linesWith, "Gambling") || has(linesWithout, "Gambling") {
+		t.Error("mortgage baseline should drop the current month's categories")
+	}
+}
+
+func TestIgnoreCurrentMonthWhenThatIsAllTheData(t *testing.T) {
+	a := testApp(t)
+	seedMonths(t, a, true)
+	rep, err := a.buildReportOpt(6, true)
+	if err != nil || !rep.Empty {
+		t.Fatalf("expected an empty analysis, got empty=%v err=%v", rep != nil && rep.Empty, err)
+	}
+	if rep, _ := a.buildReportOpt(6, false); rep.Empty {
+		t.Error("with the month included there is data")
+	}
+	// the page explains why it is empty instead of saying there are no transactions
+	c := newClient(t, a)
+	resp := c.get("/mortgage?ignoreCurrent=1")
+	body, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(body), "Include the current month") {
+		t.Errorf("empty-state message: %.300s", body)
+	}
+}
+
+func TestMortgageCalcHonoursIgnoreCurrentMonth(t *testing.T) {
+	a := testApp(t)
+	seedMonths(t, a, false)
+	c := newClient(t, a)
+	call := func(ignore bool) mortgageOut {
+		body := fmt.Sprintf(`{"down":100000,"state":"NSW","buyer":"owner","termYears":30,"ratePct":6,"bufferPct":3,"maxLvrPct":90,"otherCosts":2000,"sharePct":100,"excludeRent":true,"months":6,"ignoreCurrentMonth":%v,"adjust":{}}`, ignore)
+		req, _ := http.NewRequest("POST", c.srv.URL+"/api/mortgage/calc", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Origin", c.srv.URL)
+		resp, err := c.http.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out mortgageOut
+		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	incl, excl := call(false), call(true)
+	if excl.ExpensesM >= incl.ExpensesM || excl.Price <= incl.Price {
+		t.Errorf("ignoring the one-off spike should lower spending and raise the price: expenses %.0f vs %.0f, price %.0f vs %.0f",
+			excl.ExpensesM, incl.ExpensesM, excl.Price, incl.Price)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http"
 	"sort"
+	"time"
 )
 
 // ---- affordability model (pure functions, unit-tested) -------------------
@@ -42,20 +43,21 @@ type baseLine struct {
 }
 
 type mortgageIn struct {
-	Down         float64            `json:"down"`
-	State        string             `json:"state"`
-	Buyer        string             `json:"buyer"` // owner | fhb | investor
-	TermYears    int                `json:"termYears"`
-	RatePct      float64            `json:"ratePct"`
-	BufferPct    float64            `json:"bufferPct"`
-	MaxLVRPct    float64            `json:"maxLvrPct"`
-	OtherCosts   float64            `json:"otherCosts"`
-	DutyOverride *float64           `json:"dutyOverride"`
-	SharePct     float64            `json:"sharePct"` // % of the monthly surplus committed to the mortgage
-	ExcludeRent  bool               `json:"excludeRent"`
-	Months       int                `json:"months"`
-	Adjust       map[string]float64 `json:"adjust"` // category -> % change (-100..+100)
-	ExtraIncome  float64            `json:"extraIncome"`
+	Down               float64            `json:"down"`
+	State              string             `json:"state"`
+	Buyer              string             `json:"buyer"` // owner | fhb | investor
+	TermYears          int                `json:"termYears"`
+	RatePct            float64            `json:"ratePct"`
+	BufferPct          float64            `json:"bufferPct"`
+	MaxLVRPct          float64            `json:"maxLvrPct"`
+	OtherCosts         float64            `json:"otherCosts"`
+	DutyOverride       *float64           `json:"dutyOverride"`
+	SharePct           float64            `json:"sharePct"` // % of the monthly surplus committed to the mortgage
+	ExcludeRent        bool               `json:"excludeRent"`
+	IgnoreCurrentMonth bool               `json:"ignoreCurrentMonth"` // leave the (incomplete) current month out of the analysis
+	Months             int                `json:"months"`
+	Adjust             map[string]float64 `json:"adjust"` // category -> % change (-100..+100)
+	ExtraIncome        float64            `json:"extraIncome"`
 }
 
 type mortgageOut struct {
@@ -178,8 +180,8 @@ func solveMortgage(in mortgageIn, income float64, lines []baseLine) mortgageOut 
 
 // ---- baseline from the user's transactions -----------------------------
 
-func (a *app) mortgageBaseline(months int) (income float64, lines []baseLine, rep *report, err error) {
-	rep, err = a.buildReport(months)
+func (a *app) mortgageBaseline(months int, skipCurrent bool) (income float64, lines []baseLine, rep *report, err error) {
+	rep, err = a.buildReportOpt(months, skipCurrent)
 	if err != nil || rep.Empty {
 		return 0, nil, rep, err
 	}
@@ -210,7 +212,9 @@ func (a *app) mortgagePage(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("months") == "" {
 		months = 6
 	}
-	income, lines, rep, err := a.mortgageBaseline(months)
+	ign := r.URL.Query().Get("ignoreCurrent")
+	ignoreCurrent := ign == "1"
+	income, lines, rep, err := a.mortgageBaseline(months, ignoreCurrent)
 	if err != nil {
 		fail(w, err, 500)
 		return
@@ -221,8 +225,9 @@ func (a *app) mortgagePage(w http.ResponseWriter, r *http.Request) {
 		states = append(states, stateView{s.Code, s.Name, s.Status, s.URL})
 	}
 	a.tpl.ExecuteTemplate(w, "mortgage.html", map[string]any{
-		"Empty": rep == nil || rep.Empty,
+		"Empty": rep == nil || rep.Empty, "IgnoreCurrent": ignoreCurrent,
 		"Boot": map[string]any{"income": income, "lines": lines, "states": states, "months": months,
+			"ignoreCurrent": ignoreCurrent, "ignoreParam": ign != "", "currentMonth": time.Now().Format("January 2006"),
 			"from": func() string {
 				if rep != nil {
 					return rep.From
@@ -247,7 +252,7 @@ func (a *app) mortgageCalc(w http.ResponseWriter, r *http.Request) {
 	if in.Months < 1 || in.Months > 24 {
 		in.Months = 6
 	}
-	income, lines, _, err := a.mortgageBaseline(in.Months)
+	income, lines, _, err := a.mortgageBaseline(in.Months, in.IgnoreCurrentMonth)
 	if err != nil {
 		fail(w, err, 500)
 		return

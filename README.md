@@ -67,7 +67,8 @@ Classification order: your rules, then a built-in dictionary of AU merchants and
 1. Enter your deposit, state, buyer type (owner-occupier, first home buyer, investor), term, and either type a rate or pick one from the market list.
 2. **Borrowing capacity** = your average monthly surplus (income minus spending from your transactions) that can service a loan at *rate + stress buffer* (default +3 points, like lenders use). Current rent is removed by default, since it stops when you buy. Existing loans, credit cards and BNPL stay in as spending.
 3. **Purchase price** solves `price + stamp duty + other costs = deposit + loan`, with the loan capped by your maximum LVR.
-4. **Sliders** change each spending category from -100% to +100% in 1% steps; the price recalculates as you drag.
+4. **Ignore the current month** (tickbox): leaves this calendar month out of the income and spending averages, because it is only partly complete. The analysed window then ends at the last transaction before it. The choice is remembered.
+5. **Sliders** change each spending category from -100% to +100% in 1% steps; the price recalculates as you drag.
 
 **Rates.** *Search for current rates* downloads every home-loan rate that Australian banks, credit unions and building societies publish under the Consumer Data Right (free, no key; about 90 lenders, ~8,000 rates, ~1 minute). Staff, veteran, green-loan and other special-eligibility products and rate outliers are hidden unless you tick the box. Mortgage brokers don't publish a feed, so they can't be listed; they place loans with these same lenders.
 

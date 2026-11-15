@@ -25,7 +25,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}.dim{opacity:.45}
 <body>
 <main>
 {{template "nav" "mortgage"}}
-{{if .Empty}}<div class="card">No transactions yet, so there is no income or spending to base a borrowing estimate on. <a href="/import">Import a CSV</a> first.</div>{{else}}
+{{if .Empty}}<div class="card">{{if .IgnoreCurrent}}There is nothing to analyse once the current month is left out (all your transactions are from this month). <a href="/mortgage?ignoreCurrent=0">Include the current month</a>.{{else}}No transactions yet, so there is no income or spending to base a borrowing estimate on. <a href="/import">Import a statement</a> first.{{end}}</div>{{else}}
 
 <div class="card" role="note">
   <p style="margin:0">Estimates how much you could borrow from the income and spending found in your transactions
@@ -50,6 +50,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}.dim{opacity:.45}
     <label>Spending history to use<select id="months"><option value="3">3 months</option><option value="6">6 months</option><option value="12">12 months</option></select></label>
   </div>
   <p style="margin:10px 0 0"><label><input type="checkbox" id="norent"> My current rent stops when I buy (remove it from spending)</label></p>
+  <p style="margin:6px 0 0"><label><input type="checkbox" id="skipcur"> Ignore the current month (<span id="curMonth"></span>), which isn't complete yet</label></p>
   <p class="mut small" id="rateNote" style="margin:6px 0 0"></p>
 </div>
 
@@ -114,13 +115,20 @@ const bind = (id, key, num) => { const e = $(id); if (e.type === 'checkbox') e.c
   e.addEventListener('input', () => { S[key] = e.type === 'checkbox' ? e.checked : e.value; if (id === 'rate') { rateLabel = ''; } persist(); calc(); }); };
 const persist = () => { try { localStorage.setItem('bb-mortgage', JSON.stringify(S)); } catch {} };
 [['down','down'],['state','state'],['buyer','buyer'],['term','term'],['rate','rate'],['buffer','buffer'],['lvr','lvr'],['other','other'],['duty','duty'],['share','share'],['extra','extra'],['months','months'],['norent','norent']].forEach(([i,k]) => bind(i,k));
-$('months').addEventListener('change', () => { location.href = '/mortgage?months=' + S.months; });
+const reload = () => { location.href = '/mortgage?months=' + S.months + '&ignoreCurrent=' + (S.ignoreCurrent ? '1' : '0'); };
+$('months').addEventListener('change', reload);
+// The analysed window changes, so the page (categories, sliders) is rebuilt on the server.
+$('curMonth').textContent = BOOT.currentMonth;
+$('skipcur').checked = !!BOOT.ignoreCurrent;
+$('skipcur').addEventListener('change', () => { S.ignoreCurrent = $('skipcur').checked; persist(); reload(); });
+if (BOOT.ignoreParam) { if (!!S.ignoreCurrent !== !!BOOT.ignoreCurrent) { S.ignoreCurrent = !!BOOT.ignoreCurrent; persist(); } }
+else if (S.ignoreCurrent) { reload(); return; } // remembered choice from last visit
 if (String(BOOT.months) !== String(S.months)) { S.months = String(BOOT.months); $('months').value = S.months; }
 
 function payload(adj) {
   return { down: +S.down || 0, state: S.state, buyer: S.buyer, termYears: +S.term, ratePct: +S.rate || 0, bufferPct: +S.buffer || 0,
     maxLvrPct: +S.lvr || 90, otherCosts: +S.other || 0, dutyOverride: S.duty === '' ? null : +S.duty, sharePct: +S.share || 100,
-    excludeRent: !!S.norent, months: +S.months, adjust: adj, extraIncome: +S.extra || 0 };
+    excludeRent: !!S.norent, ignoreCurrentMonth: !!S.ignoreCurrent, months: +S.months, adjust: adj, extraIncome: +S.extra || 0 };
 }
 const post = body => fetch('/api/mortgage/calc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
 
