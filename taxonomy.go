@@ -181,6 +181,7 @@ type classifier struct {
 	cache map[string]cacheEntry
 	learn *learner // examples from your manual categorisations (nil-safe)
 	hist  *history // trustworthy categorised transactions, for similarity guesses (nil-safe)
+	reimb reimbCfg // repayments from other people (see reimb.go)
 }
 
 // Plaid's coarse categories, mapped onto ours (used only as a last-resort hint).

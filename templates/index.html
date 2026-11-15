@@ -35,6 +35,7 @@ button.small-btn{padding:1px 9px;font-size:12px}
   </div>
 </header>
 {{if .Flash}}<div class="card flash" role="status">{{.Flash}}</div>{{end}}
+{{if and .UnassignedReimb (ne .F.Reimb "unassigned")}}<div class="card" role="note"><strong>{{.UnassignedReimb}}</strong> small credit(s) from other people look like repayments but are not matched to a spending category yet. <a href="/transactions?reimb=unassigned">Choose what each one offsets</a>: set its category (for example Dining &amp; Takeaway) and it reduces that spending instead of counting as income.</div>{{end}}
 
 <form method="get" action="/transactions" class="card" id="ff">
   <div class="row">
@@ -70,6 +71,7 @@ button.small-btn{padding:1px 9px;font-size:12px}
       <label class="f">Categorised by<select name="how"><option value="">Anything</option>{{range .Hows}}<option value="{{.Value}}" {{if eq .Value $.F.How}}selected{{end}}>{{.Label}}</option>{{end}}</select></label>
     </div>
     <div class="stack">
+      <label class="f">Repayments from others<select name="reimb"><option value="">Any</option><option value="only" {{if eq .F.Reimb "only"}}selected{{end}}>Only repayments from others</option><option value="unassigned" {{if eq .F.Reimb "unassigned"}}selected{{end}}>Only those needing a category</option></select></label>
       <label class="f">Ignored transactions<select name="ignored"><option value="">Hide (default)</option><option value="show" {{if eq .F.Ign "show"}}selected{{end}}>Show with the others</option><option value="only" {{if eq .F.Ign "only"}}selected{{end}}>Only ignored</option></select></label>
       <label class="f">Sort by<select name="sort">{{range .Sorts}}<option value="{{.Value}}" {{if eq .Value $.F.Sort}}selected{{end}}>{{.Label}}</option>{{end}}</select></label>
       <div class="row"><button class="primary">Apply filters</button><a href="{{.ClearURL}}">Reset</a></div>
@@ -108,6 +110,9 @@ button.small-btn{padding:1px 9px;font-size:12px}
         <form class="inline" method="post" action="/txn/ignore"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="mode" value="include"><button class="small-btn" title="Count this transaction in the analysis anyway">Count it</button></form>
         {{else if eq .Override -1}}<span class="pill" title="You chose to count this although it would normally be ignored">counted anyway</span>
         <form class="inline" method="post" action="/txn/ignore"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="mode" value="auto"><button class="small-btn" title="Go back to ignoring it automatically">Ignore</button></form>{{end}}
+        {{if .Reimb}}<span class="pill reimb" title="Money paid back to you by another person. It reduces spending in the category shown{{if .ReimbHeld}}; set that category{{end}}.">{{if .ReimbHeld}}repayment · pick category{{else}}repaid by others{{end}}</span>
+        <form class="inline" method="post" action="/txn/reimb"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="mode" value="no"><button class="small-btn" title="This is not a repayment from someone">Not a repayment</button></form>
+        {{else if .CanReimb}}<form class="inline" method="post" action="/txn/reimb"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="mode" value="yes"><button class="small-btn" title="Someone paying you back: it offsets spending instead of counting as income">Repaid by others</button></form>{{end}}
       </td>
       <td class="amt {{if lt .Amount 0.0}}in{{else}}out{{end}}">{{printf "%.2f" (neg .Amount)}}</td>
     </tr>

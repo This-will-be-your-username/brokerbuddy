@@ -61,7 +61,7 @@ func newClassifier(db *sql.DB) (*classifier, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &classifier{rules: r, cache: c, learn: l, hist: h}, nil
+	return &classifier{rules: r, cache: c, learn: l, hist: h, reimb: loadReimbCfg(db)}, nil
 }
 
 // loadHistory collects merchants whose category is trustworthy, to guess for look-alikes.
@@ -109,7 +109,7 @@ func recategorize(db *sql.DB) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	rows, err := db.Query(`SELECT plaid_txn_id, name, merchant, plaid_category, amount, category, confidence FROM transactions WHERE manual=0`)
+	rows, err := db.Query(`SELECT plaid_txn_id, name, merchant, plaid_category, amount, category, confidence, reimb_override FROM transactions WHERE manual=0`)
 	if err != nil {
 		return 0, err
 	}
@@ -122,12 +122,12 @@ func recategorize(db *sql.DB) (int, error) {
 	for rows.Next() {
 		var id, n, m, p, oldCat string
 		var amt float64
-		var oldConf int
-		if err := rows.Scan(&id, &n, &m, &p, &amt, &oldCat, &oldConf); err != nil {
+		var oldConf, over int
+		if err := rows.Scan(&id, &n, &m, &p, &amt, &oldCat, &oldConf, &over); err != nil {
 			rows.Close()
 			return 0, err
 		}
-		r := cl.classifyFull(n, m, p, amt)
+		r := cl.classifyFullWith(n, m, p, amt, over)
 		if r.Cat != oldCat {
 			changed++
 		}
@@ -140,7 +140,7 @@ func recategorize(db *sql.DB) (int, error) {
 	}
 	defer tx.Rollback()
 	for _, u := range ups {
-		if _, err := tx.Exec(`UPDATE transactions SET category=?, cat_source=?, confidence=? WHERE plaid_txn_id=?`, u.res.Cat, u.res.Src, u.res.Conf, u.id); err != nil {
+		if _, err := tx.Exec(`UPDATE transactions SET category=?, cat_source=?, confidence=?, reimb=? WHERE plaid_txn_id=?`, u.res.Cat, u.res.Src, u.res.Conf, boolInt(u.res.Reimb), u.id); err != nil {
 			return 0, err
 		}
 	}

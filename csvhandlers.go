@@ -309,17 +309,21 @@ func (a *app) importRun(w http.ResponseWriter, r *http.Request) {
 	added := 0
 	levels := map[string]int{} // confidence of the transactions actually added
 	skippedCard := 0           // card repayments that are ignored
+	reimbN := 0                // repayments from other people that were flagged
 	for i, t := range txns {
 		cr := cl.classifyFull(t.Desc, "", t.Cat, t.Amount)
-		res, err := tx.Exec(`INSERT INTO transactions(plaid_txn_id,account_id,date,name,merchant,amount,plaid_category,category,cat_source,confidence)
-			VALUES(?,?,?,?,'',?,?,?,?,?) ON CONFLICT(plaid_txn_id) DO NOTHING`,
-			ids[i], acct, t.Date, t.Desc, t.Amount, t.Cat, cr.Cat, cr.Src, cr.Conf)
+		res, err := tx.Exec(`INSERT INTO transactions(plaid_txn_id,account_id,date,name,merchant,amount,plaid_category,category,cat_source,confidence,reimb)
+			VALUES(?,?,?,?,'',?,?,?,?,?,?) ON CONFLICT(plaid_txn_id) DO NOTHING`,
+			ids[i], acct, t.Date, t.Desc, t.Amount, t.Cat, cr.Cat, cr.Src, cr.Conf, boolInt(cr.Reimb))
 		if err != nil {
 			fail(w, err, 500)
 			return
 		}
 		if n, _ := res.RowsAffected(); n > 0 {
 			added++
+			if cr.Reimb {
+				reimbN++
+			}
 			if cctx.auto(card, cr.Cat, t.Amount, t.Desc) != ignoreNone {
 				skippedCard++ // an ignored repayment: not part of the review summary
 			} else {
@@ -342,6 +346,9 @@ func (a *app) importRun(w http.ResponseWriter, r *http.Request) {
 	msg := fmt.Sprintf("Imported %d transactions (%d duplicates skipped).", added, len(txns)-added)
 	if skippedCard > 0 {
 		msg += fmt.Sprintf(" %d credit card repayment(s) ignored.", skippedCard)
+	}
+	if reimbN > 0 {
+		msg += fmt.Sprintf(" %d repayment(s) from other people flagged: they offset spending, so check the category each one relates to.", reimbN)
 	}
 	dest := "/?msg="
 	if need := levels["low"] + levels["unknown"]; need > 0 {

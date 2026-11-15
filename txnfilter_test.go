@@ -31,8 +31,12 @@ func seedFilterData(t *testing.T) *app {
 
 func fids(html string) []string {
 	var out []string
+	seen := map[string]bool{} // a row can contain several forms for the same transaction
 	for _, m := range regexp.MustCompile(`name="id" value="(f\d+)"`).FindAllStringSubmatch(html, -1) {
-		out = append(out, m[1])
+		if !seen[m[1]] {
+			seen[m[1]] = true
+			out = append(out, m[1])
+		}
 	}
 	return out
 }

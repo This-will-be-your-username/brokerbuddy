@@ -118,6 +118,8 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("POST /accounts/flag", a.flagAccount)
 	mux.HandleFunc("POST /settings/cards", a.saveCardSettings)
 	mux.HandleFunc("POST /txn/ignore", a.setIgnoreOverride)
+	mux.HandleFunc("POST /txn/reimb", a.setReimb)
+	mux.HandleFunc("POST /settings/reimb", a.saveReimbSettings)
 	// settings & sign-in
 	mux.HandleFunc("GET /settings", a.settingsPage)
 	mux.HandleFunc("POST /settings/plaid", a.savePlaid)
@@ -178,6 +180,10 @@ type txnRow struct {
 	Ignored                                   bool // a credit card repayment that is left out of the analysis
 	Override                                  int  // -1 = counted although it would be ignored
 	IgnoreWhy                                 string
+	Reimb                                     bool // a repayment from another person: its category is the spending it offsets
+	ReimbOverride                             int
+	ReimbHeld                                 bool   // flagged, but not yet matched to a spending category
+	CanReimb                                  bool   // a credit that could be flagged as a repayment
 	Level, Why                                string // confidence level (confirmed/high/medium/low/unknown) and the reason
 }
 

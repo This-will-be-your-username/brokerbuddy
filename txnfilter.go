@@ -26,6 +26,7 @@ type txnFilter struct {
 	From, To string // YYYY-MM-DD
 	Min, Max string // dollar amounts, compared with the absolute value
 	Ign      string // "" = hide ignored credit card repayments, show = include them, only = just those
+	Reimb    string // only = repayments from others, unassigned = those not yet matched to a spending category
 	Page     int
 }
 
@@ -89,6 +90,9 @@ func parseTxnFilter(q url.Values) txnFilter {
 	if v := q.Get("ignored"); v == "show" || v == "only" {
 		f.Ign = v
 	}
+	if v := q.Get("reimb"); v == "only" || v == "unassigned" {
+		f.Reimb = v
+	}
 	if n, err := strconv.Atoi(q.Get("page")); err == nil && n > 1 {
 		f.Page = n
 	}
@@ -129,6 +133,7 @@ func (f txnFilter) values() url.Values {
 	set("min", f.Min)
 	set("max", f.Max)
 	set("ignored", f.Ign)
+	set("reimb", f.Reimb)
 	return v
 }
 
@@ -210,6 +215,12 @@ func (f txnFilter) where(withConf bool) ([]string, []any) {
 	default:
 		conds, args = append(conds, "t.manual=0 AND t.cat_source=?"), append(args, f.How)
 	}
+	switch f.Reimb {
+	case "only":
+		conds = append(conds, "t.reimb=1")
+	case "unassigned":
+		conds = append(conds, "t.reimb=1 AND t.category IN ('Transfers','Other Income','Uncategorized')")
+	}
 	switch f.Ign {
 	case "":
 		conds = append(conds, "t.ignored=0")
@@ -277,6 +288,10 @@ func (f txnFilter) active(acctName map[string]string) []activeFilter {
 	if f.How != "" {
 		add("Categorised by: "+validHow[f.How], func(g *txnFilter) { g.How = "" })
 	}
+	if f.Reimb != "" {
+		label := map[string]string{"only": "Repayments from others", "unassigned": "Repayments to assign"}[f.Reimb]
+		add(label, func(g *txnFilter) { g.Reimb = "" })
+	}
 	if f.Ign != "" {
 		label := map[string]string{"show": "Including ignored", "only": "Only ignored"}[f.Ign]
 		add(label, func(g *txnFilter) { g.Ign = "" })
@@ -319,7 +334,7 @@ func (a *app) index(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var txns []txnRow
-	rows, err := a.db.Query(`SELECT t.plaid_txn_id,t.date,t.name,a.name||CASE WHEN a.mask<>'' THEN ' ••'||a.mask ELSE '' END,t.category,t.amount,t.manual,t.cat_source,t.confidence,t.ignored,t.ignore_override,a.is_card
+	rows, err := a.db.Query(`SELECT t.plaid_txn_id,t.date,t.name,a.name||CASE WHEN a.mask<>'' THEN ' ••'||a.mask ELSE '' END,t.category,t.amount,t.manual,t.cat_source,t.confidence,t.ignored,t.ignore_override,a.is_card,t.reimb,t.reimb_override
 		FROM transactions t JOIN accounts a ON a.plaid_account_id=t.account_id
 		WHERE `+W+fmt.Sprintf(` ORDER BY %s LIMIT %d OFFSET %d`, f.order(), txnPageSize, (f.Page-1)*txnPageSize), args...)
 	if err != nil {
@@ -328,8 +343,11 @@ func (a *app) index(w http.ResponseWriter, r *http.Request) {
 	}
 	for rows.Next() {
 		var t txnRow
-		var ign, card int
-		rows.Scan(&t.ID, &t.Date, &t.Name, &t.Account, &t.Category, &t.Amount, &t.Manual, &t.Source, &t.Conf, &ign, &t.Override, &card)
+		var ign, card, rb int
+		rows.Scan(&t.ID, &t.Date, &t.Name, &t.Account, &t.Category, &t.Amount, &t.Manual, &t.Source, &t.Conf, &ign, &t.Override, &card, &rb, &t.ReimbOverride)
+		t.Reimb = rb == 1
+		t.ReimbHeld = t.Reimb && isHeldCat(t.Category)
+		t.CanReimb = t.Amount < 0 && !t.Reimb && ign == 0 && t.Category != "Salary & Wages" && t.Category != "Government Benefits" && t.Category != "Rental Income"
 		t.Ignored = ign == 1
 		if t.Ignored {
 			t.IgnoreWhy = ignoreWhy(map[bool]string{true: ignoreCardPayment, false: ignorePaidElsewhere}[card == 1])
@@ -415,7 +433,7 @@ func (a *app) index(w http.ResponseWriter, r *http.Request) {
 		"Txns": txns, "Cats": allCategories(), "Accounts": accts, "Groups": groups, "Sorts": sorts, "Hows": hows,
 		"F": f, "SelAcct": selAcct, "SelCat": selCat, "Chips": chips, "Active": active, "NActive": len(active),
 		"Total": total, "OutSum": out, "InSum": in, "Page": f.Page, "Pages": pages, "First": first, "Last": last,
-		"PrevURL": prevURL, "NextURL": nextURL, "ClearURL": "/transactions", "HiddenIgnored": hidden, "ShowIgnoredURL": showIgnoredURL,
+		"PrevURL": prevURL, "NextURL": nextURL, "ClearURL": "/transactions", "HiddenIgnored": hidden, "ShowIgnoredURL": showIgnoredURL, "UnassignedReimb": a.unassignedReimb(),
 		"PlaidReady": a.pc() != nil, "Flash": q.Get("msg"),
 	})
 }

@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -307,6 +308,7 @@ func (a *app) settingsPage(w http.ResponseWriter, r *http.Request) {
 		addr = ":443"
 	}
 	a.tpl.ExecuteTemplate(w, "settings.html", map[string]any{
+		"ReimbEnabled": loadReimbCfg(a.db).enabled, "ReimbMax": strconv.FormatFloat(loadReimbCfg(a.db).max, 'f', -1, 64), "ReimbCount": a.countReimb(),
 		"AllAccounts": a.accountRows(), "CardElsewhere": loadCardCtx(a.db).elsewhere, "IgnoredTotal": a.countIgnored(""),
 		"Flash": q.Get("msg"), "Error": q.Get("err"),
 		"PlaidClientID": a.getSetting("plaid_client_id"), "PlaidSecretSet": a.getSetting("plaid_secret") != "",

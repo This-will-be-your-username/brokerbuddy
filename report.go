@@ -23,7 +23,9 @@ type repGroup struct {
 type repFlag struct{ Level, Text string }
 
 type report struct {
-	SkippedMonth                 bool // the current month was left out of the analysis
+	ReimbN, ReimbHeld            int     // repayments from others: matched to spending / still waiting for a category
+	ReimbAmt                     float64 // total of those matched, which reduced spending
+	SkippedMonth                 bool    // the current month was left out of the analysis
 	Months                       int
 	From, To                     string
 	SpanMonths                   float64
@@ -121,10 +123,19 @@ func (a *app) buildReportOpt(months int, skipCurrent bool) (*report, error) {
 		rep.Groups = append(rep.Groups, *groups[g])
 	}
 
+	// Repayments from other people reduced spending; say so, and say if any are still unmatched.
+	a.db.QueryRow(`SELECT COUNT(*), COALESCE(-SUM(amount),0) FROM transactions WHERE ignored=0 AND reimb=1 AND category NOT IN ('Transfers','Other Income','Uncategorized') AND date>=? AND date<=?`, rep.From, rep.To).Scan(&rep.ReimbN, &rep.ReimbAmt)
+	a.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE ignored=0 AND reimb=1 AND category IN ('Transfers','Other Income','Uncategorized') AND date>=? AND date<=?`, rep.From, rep.To).Scan(&rep.ReimbHeld)
 	// Things a lender's assessor tends to circle.
 	spent := func(c string) repLine { return byCat[c] }
 	add := func(level, f string, args ...any) {
 		rep.Flags = append(rep.Flags, repFlag{level, fmt.Sprintf(f, args...)})
+	}
+	if rep.ReimbN > 0 {
+		add("low", "Repayments from other people reduced spending by $%.2f across %d credit(s), each counted against the category it relates to.", rep.ReimbAmt, rep.ReimbN)
+	}
+	if rep.ReimbHeld > 0 {
+		add("med", "%d small credit(s) from other people have not been matched to a spending category. Until they are, they count as neither income nor a spending offset.", rep.ReimbHeld)
 	}
 	if l := spent("Gambling"); l.Count > 0 {
 		add("high", "Gambling: %d transactions, $%.2f. Lenders often ask for an explanation, or want to see none in recent months.", l.Count, l.Total)

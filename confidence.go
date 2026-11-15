@@ -24,6 +24,7 @@ import (
 type result struct {
 	Cat, Src string
 	Conf     int
+	Reimb    bool // a repayment from another person (offsets spending)
 }
 
 // confLevel buckets a score for display and filtering.
@@ -63,6 +64,8 @@ func srcWhy(src string, manual bool) string {
 		return "Similar to other transactions in your history."
 	case "cue":
 		return "A weak guess from the wording of the description."
+	case "reimb":
+		return "Looks like a repayment from another person, so it offsets spending instead of counting as income. Pick the category it relates to if it is not right."
 	}
 	return "No match found. Set a category to teach the app."
 }
@@ -251,47 +254,62 @@ func cueGuess(text string, amount float64) (string, int, bool) {
 
 // classifyFull always attempts a category and says how sure it is.
 func (c *classifier) classifyFull(name, merchant, hint string, amount float64) result {
+	return c.classifyFullWith(name, merchant, hint, amount, 0)
+}
+
+// classifyFullWith is classifyFull plus the user's repayment override (1 yes, -1 no, 0 automatic):
+// a small credit from another person is flagged and assigned the spending category it offsets.
+func (c *classifier) classifyFullWith(name, merchant, hint string, amount float64, reimbOverride int) result {
+	r := c.classifyBase(name, merchant, hint, amount)
+	if amount >= 0 || reimbOverride == -1 || (!c.reimb.enabled && reimbOverride != 1) {
+		return r
+	}
+	return c.reimbursement(name, merchant, amount, r, reimbOverride)
+}
+
+// classifyBase is the ordinary ladder, before repayments from others are considered.
+func (c *classifier) classifyBase(name, merchant, hint string, amount float64) result {
 	hay := strings.ToLower(name + " " + merchant)
 	for _, r := range c.rules {
 		if r.Pattern != "" && strings.Contains(hay, strings.ToLower(r.Pattern)) {
-			return result{r.Category, "rule", 95}
+			return result{r.Category, "rule", 95, false}
 		}
 	}
 	lcat, strong, lok := c.learn.match(name, merchant, amount)
 	if lok && strong {
-		return result{lcat, "learned", 90} // you categorised this merchant before: beats the built-in list
+		return result{lcat, "learned", 90, false} // you categorised this merchant before: beats the built-in list
 	}
 	text := norm(name + " " + merchant)
 	if cat, phrase, glued, ok := dictLookup(text, amount); ok {
-		return result{cat, "builtin", phraseConf(phrase, glued)}
+		return result{cat, "builtin", phraseConf(phrase, glued), false}
 	}
 	if lok {
-		return result{lcat, "learned", 60} // same brand as something you categorised, different details
+		return result{lcat, "learned", 60, false} // same brand as something you categorised, different details
 	}
 	if key := merchantKey(name + " " + merchant); key != "" {
 		for _, k := range []string{key, strings.Fields(key)[0]} { // full key, then first word (drops suburb noise)
 			if e, ok := c.cache[k]; ok && e.Category != "" {
-				return result{e.Category, "lookup", 50}
+				return result{e.Category, "lookup", 50, false}
 			}
 		}
 	}
 	if t, ok := strings.CutPrefix(hint, "csv:"); ok && strings.TrimSpace(t) != "" {
-		return result{strings.TrimSpace(t), "hint", 55}
+		return result{strings.TrimSpace(t), "hint", 55, false}
 	}
 	if cat, ok := pfcMap[hint]; ok && !(isIncomeCat(cat) && amount > 0) {
-		return result{cat, "hint", 50}
+		return result{cat, "hint", 50, false}
 	}
 	toks := descriptorTokens(name + " " + merchant)
 	if cat, ok := fuzzyBrand(toks, amount); ok {
-		return result{cat, "fuzzy", 52}
+		return result{cat, "fuzzy", 52, false}
 	}
 	if cat, conf, ok := c.hist.guess(toks, amount); ok {
-		return result{cat, "history", conf}
+		return result{cat, "history", conf, false}
 	}
 	if cat, conf, ok := cueGuess(text, amount); ok {
-		return result{cat, "cue", conf}
+		return result{cat, "cue", conf, false}
 	}
-	return result{"Uncategorized", "", 0}
+	return result{"Uncategorized", "", 0, false}
 }
 
 // classify keeps the simple (category, source) form.

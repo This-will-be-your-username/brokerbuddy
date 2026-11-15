@@ -59,14 +59,15 @@ func (a *app) syncItemByPlaidID(plaidItemID string) error {
 		for _, t := range append(res.Added, res.Modified...) {
 			res := cl.classifyFull(t.Name, t.MerchantName, t.PFC.Primary, t.Amount)
 			// Manual overrides survive re-syncs.
-			if _, err := tx.Exec(`INSERT INTO transactions(plaid_txn_id,account_id,date,name,merchant,amount,plaid_category,category,cat_source,confidence)
-				VALUES(?,?,?,?,?,?,?,?,?,?)
+			if _, err := tx.Exec(`INSERT INTO transactions(plaid_txn_id,account_id,date,name,merchant,amount,plaid_category,category,cat_source,confidence,reimb)
+				VALUES(?,?,?,?,?,?,?,?,?,?,?)
 				ON CONFLICT(plaid_txn_id) DO UPDATE SET date=excluded.date, name=excluded.name, merchant=excluded.merchant,
 					amount=excluded.amount, plaid_category=excluded.plaid_category,
 					category=CASE WHEN transactions.manual=1 THEN transactions.category ELSE excluded.category END,
 					cat_source=CASE WHEN transactions.manual=1 THEN transactions.cat_source ELSE excluded.cat_source END,
-					confidence=CASE WHEN transactions.manual=1 THEN transactions.confidence ELSE excluded.confidence END`,
-				t.ID, t.AccountID, t.Date, t.Name, t.MerchantName, t.Amount, t.PFC.Primary, res.Cat, res.Src, res.Conf); err != nil {
+					confidence=CASE WHEN transactions.manual=1 THEN transactions.confidence ELSE excluded.confidence END,
+					reimb=CASE WHEN transactions.manual=1 OR transactions.reimb_override<>0 THEN transactions.reimb ELSE excluded.reimb END`,
+				t.ID, t.AccountID, t.Date, t.Name, t.MerchantName, t.Amount, t.PFC.Primary, res.Cat, res.Src, res.Conf, boolInt(res.Reimb)); err != nil {
 				return err
 			}
 		}

@@ -36,7 +36,9 @@ CREATE TABLE IF NOT EXISTS transactions (
 	confidence INTEGER NOT NULL DEFAULT 0, -- 0-100; 100 = set by you
 	edited_seq INTEGER NOT NULL DEFAULT 0, -- order of manual edits: the most recent edit wins when examples disagree
 	ignored INTEGER NOT NULL DEFAULT 0,    -- 1 = left out of every analysis (credit card repayments)
-	ignore_override INTEGER NOT NULL DEFAULT 0 -- 1 = always ignore, -1 = always count, 0 = automatic
+	ignore_override INTEGER NOT NULL DEFAULT 0, -- 1 = always ignore, -1 = always count, 0 = automatic
+	reimb INTEGER NOT NULL DEFAULT 0,          -- 1 = a repayment from another person: its category is the spending it offsets
+	reimb_override INTEGER NOT NULL DEFAULT 0  -- 1 = flagged by you, -1 = not a repayment (you said so), 0 = automatic
 );
 CREATE INDEX IF NOT EXISTS idx_txn_date ON transactions(date DESC);
 CREATE TABLE IF NOT EXISTS csv_profiles (
@@ -93,6 +95,8 @@ func openDB(path string) (*sql.DB, error) {
 	db.Exec(`ALTER TABLE transactions ADD COLUMN edited_seq INTEGER NOT NULL DEFAULT 0`)
 	db.Exec(`ALTER TABLE transactions ADD COLUMN ignored INTEGER NOT NULL DEFAULT 0`)
 	db.Exec(`ALTER TABLE transactions ADD COLUMN ignore_override INTEGER NOT NULL DEFAULT 0`)
+	db.Exec(`ALTER TABLE transactions ADD COLUMN reimb INTEGER NOT NULL DEFAULT 0`)
+	db.Exec(`ALTER TABLE transactions ADD COLUMN reimb_override INTEGER NOT NULL DEFAULT 0`)
 	db.Exec(`ALTER TABLE accounts ADD COLUMN is_card INTEGER NOT NULL DEFAULT 0`)
 	db.Exec(`UPDATE transactions SET confidence=100, cat_source='manual' WHERE manual=1 AND confidence<100`)
 	return db, nil
