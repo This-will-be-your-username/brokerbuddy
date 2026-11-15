@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -20,6 +21,7 @@ type importSession struct {
 	filename string
 	header   []string
 	data     [][]string
+	notes    []string // shown above the mapping, e.g. what the PDF reader did
 	created  time.Time
 }
 
@@ -96,17 +98,38 @@ func (a *app) importPage(w http.ResponseWriter, r *http.Request) {
 	a.tpl.ExecuteTemplate(w, "import.html", map[string]any{"Stage": "upload", "Error": r.URL.Query().Get("err")})
 }
 
+// isPDF checks the file signature rather than trusting the file name.
+func isPDF(b []byte) bool {
+	head := b
+	if len(head) > 1024 {
+		head = head[:1024]
+	}
+	return bytes.Contains(head, []byte("%PDF-"))
+}
+
 func (a *app) importUpload(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
 	f, hdr, err := r.FormFile("file")
 	if err != nil {
-		a.renderUploadError(w, errors.New("choose a CSV file (max 10 MB)"))
+		a.renderUploadError(w, errors.New("choose a CSV or PDF file (max 10 MB)"))
 		return
 	}
 	defer f.Close()
 	raw, err := io.ReadAll(f)
 	if err != nil {
 		a.renderUploadError(w, err)
+		return
+	}
+	if isPDF(raw) {
+		res, perr := parsePDFStatement(raw, r.FormValue("pdf_password"))
+		if perr != nil {
+			a.renderUploadError(w, perr)
+			return
+		}
+		notes := append([]string{fmt.Sprintf("Read %d transactions from %d page(s) of a PDF statement.", len(res.Rows), res.Pages)}, res.Notes...)
+		s := &importSession{filename: hdr.Filename, header: res.Header, data: res.Rows, notes: notes, created: time.Now()}
+		// PDF layouts differ per bank, so no saved CSV profile or account is pre-selected.
+		a.renderMapping(w, putSession(s), s, guessMapping(res.Header, res.Rows), "", "", "", "")
 		return
 	}
 	rows, err := readCSV(raw)
@@ -161,7 +184,7 @@ func (a *app) renderMapping(w http.ResponseWriter, tok string, s *importSession,
 		"Desc2Opts": colOpts(s.header, m.Desc2, true), "AmountOpts": colOpts(s.header, m.Amount, false),
 		"DebitOpts": colOpts(s.header, m.Debit, false), "CreditOpts": colOpts(s.header, m.Credit, false),
 		"CatOpts": colOpts(s.header, m.Category, true), "Layouts": layouts,
-		"Accounts": a.manualAccounts(), "Acct": acct, "NewName": newName,
+		"Accounts": a.manualAccounts(), "Acct": acct, "NewName": newName, "Notes": s.notes,
 	})
 }
 

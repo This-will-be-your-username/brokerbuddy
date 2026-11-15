@@ -3,27 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Import CSV · BrokerBuddy</title>
+<title>Import · BrokerBuddy</title>
 {{template "style"}}{{template "navstyle"}}
 <style>.err{color:var(--neg)}label.f{display:block;margin:8px 0 2px;color:var(--mut);font-size:13px}.row{display:flex;gap:16px;flex-wrap:wrap}.row>div{min-width:200px}</style>
 </head>
 <body>
 <main>
 {{template "nav" "import"}}
-<header><h1>Import CSV</h1></header>
+<header><h1>Import transactions</h1></header>
 {{if .Error}}<div class="card err" role="alert">{{.Error}}</div>{{end}}
 
 {{if eq .Stage "upload"}}
 <div class="card">
-  <p>Export transactions as CSV from your bank and upload it. Columns are detected automatically and you can correct them on the next screen. The file is processed in memory and not kept.</p>
+  <p>Upload a <strong>CSV export</strong> or a <strong>PDF statement</strong> from your bank. For PDFs the transaction table is found automatically (multi-line descriptions, dates without a year, debit/credit columns, running balances). You can correct the columns on the next screen and check a preview before anything is saved. The file is processed in memory and not kept.</p>
   <form method="post" action="/import/upload" enctype="multipart/form-data">
-    <input type="file" name="file" accept=".csv,text/csv,.txt" required>
+    <input type="file" name="file" accept=".csv,.txt,.pdf,text/csv,application/pdf" required>
+    <input type="password" name="pdf_password" placeholder="PDF password (if any)" autocomplete="off" aria-label="PDF password, only if the PDF is protected" style="min-width:220px">
     <button class="primary">Upload</button>
   </form>
 </div>
 {{else}}
 <form method="post" action="/import/run">
 <input type="hidden" name="token" value="{{.Token}}">
+{{if .Notes}}<div class="card" role="note">{{range .Notes}}<div class="small">{{.}}</div>{{end}}</div>{{end}}
 <div class="card scroll">
   <h2>{{.Filename}} — first rows</h2>
   <table><tr>{{range .Header}}<th>{{.}}</th>{{end}}</tr>
