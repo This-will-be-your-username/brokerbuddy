@@ -334,7 +334,7 @@ func (a *app) index(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var txns []txnRow
-	rows, err := a.db.Query(`SELECT t.plaid_txn_id,t.date,t.name,a.name||CASE WHEN a.mask<>'' THEN ' ••'||a.mask ELSE '' END,t.category,t.amount,t.manual,t.cat_source,t.confidence,t.ignored,t.ignore_override,a.is_card,t.reimb,t.reimb_override
+	rows, err := a.db.Query(`SELECT t.plaid_txn_id,t.date,t.name,a.name||CASE WHEN a.mask<>'' THEN ' ••'||a.mask ELSE '' END,t.category,t.amount,t.manual,t.cat_source,t.confidence,t.ignored,t.ignore_override,a.is_card,t.reimb,t.reimb_override,t.flipped
 		FROM transactions t JOIN accounts a ON a.plaid_account_id=t.account_id
 		WHERE `+W+fmt.Sprintf(` ORDER BY %s LIMIT %d OFFSET %d`, f.order(), txnPageSize, (f.Page-1)*txnPageSize), args...)
 	if err != nil {
@@ -344,7 +344,7 @@ func (a *app) index(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var t txnRow
 		var ign, card, rb int
-		rows.Scan(&t.ID, &t.Date, &t.Name, &t.Account, &t.Category, &t.Amount, &t.Manual, &t.Source, &t.Conf, &ign, &t.Override, &card, &rb, &t.ReimbOverride)
+		rows.Scan(&t.ID, &t.Date, &t.Name, &t.Account, &t.Category, &t.Amount, &t.Manual, &t.Source, &t.Conf, &ign, &t.Override, &card, &rb, &t.ReimbOverride, &t.Flipped)
 		t.Reimb = rb == 1
 		t.ReimbHeld = t.Reimb && isHeldCat(t.Category)
 		t.CanReimb = t.Amount < 0 && !t.Reimb && ign == 0 && t.Category != "Salary & Wages" && t.Category != "Government Benefits" && t.Category != "Rental Income"

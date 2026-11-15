@@ -62,7 +62,7 @@ func (a *app) syncItemByPlaidID(plaidItemID string) error {
 			if _, err := tx.Exec(`INSERT INTO transactions(plaid_txn_id,account_id,date,name,merchant,amount,plaid_category,category,cat_source,confidence,reimb)
 				VALUES(?,?,?,?,?,?,?,?,?,?,?)
 				ON CONFLICT(plaid_txn_id) DO UPDATE SET date=excluded.date, name=excluded.name, merchant=excluded.merchant,
-					amount=excluded.amount, plaid_category=excluded.plaid_category,
+					amount=CASE WHEN transactions.flipped=1 THEN -excluded.amount ELSE excluded.amount END, plaid_category=excluded.plaid_category,
 					category=CASE WHEN transactions.manual=1 THEN transactions.category ELSE excluded.category END,
 					cat_source=CASE WHEN transactions.manual=1 THEN transactions.cat_source ELSE excluded.cat_source END,
 					confidence=CASE WHEN transactions.manual=1 THEN transactions.confidence ELSE excluded.confidence END,

@@ -117,7 +117,10 @@ button.small-btn{padding:1px 9px;font-size:12px}
         <form class="inline" method="post" action="/txn/reimb"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="mode" value="no"><button class="small-btn" title="This is not a repayment from someone">Not a repayment</button></form>
         {{else if .CanReimb}}<form class="inline" method="post" action="/txn/reimb"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="mode" value="yes"><button class="small-btn" title="Someone paying you back: it offsets spending instead of counting as income">Repaid by others</button></form>{{end}}
       </td>
-      <td class="amt {{if lt .Amount 0.0}}in{{else}}out{{end}}">{{printf "%.2f" (neg .Amount)}}</td>
+      <td class="amt {{if lt .Amount 0.0}}in{{else}}out{{end}}">{{printf "%.2f" (neg .Amount)}}
+        <div class="small mut">{{if lt .Amount 0.0}}credit{{else}}debit{{end}}{{if .Flipped}} · reversed{{end}}</div>
+        <form class="inline" method="post" action="/txn/flip"><input type="hidden" name="id" value="{{.ID}}"><button class="small-btn" title="{{if lt .Amount 0.0}}This is really money going out: make it a debit{{else}}This is really money coming in: make it a credit{{end}}">⇄ {{if lt .Amount 0.0}}Make debit{{else}}Make credit{{end}}</button></form>
+      </td>
     </tr>
     {{else}}<tr><td colspan="5" class="mut">{{if .NActive}}No transactions match these filters. <a href="{{.ClearURL}}">Clear all filters</a>.{{else}}No transactions yet. <a href="/import">Import a statement</a>{{if .PlaidReady}} or connect a bank above{{end}}.{{end}}</td></tr>{{end}}
   </table>

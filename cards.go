@@ -266,3 +266,30 @@ func (a *app) accountRows() []accountRow {
 	}
 	return out
 }
+
+// setDirection reverses a transaction's debit/credit (some banks export the sign the wrong way
+// round). The amount's sign is flipped, the row remembers it was (so re-syncs keep the correction),
+// and everything that depends on direction is recomputed. Categories you set by hand are kept.
+func (a *app) flipDirection(w http.ResponseWriter, r *http.Request) {
+	id := r.FormValue("id")
+	res, err := a.db.Exec(`UPDATE transactions SET amount=-amount, flipped=1-flipped, reimb_override=0 WHERE plaid_txn_id=?`, id)
+	if err != nil {
+		fail(w, err, 500)
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		fail(w, errBad, 404)
+		return
+	}
+	if _, err := recategorize(a.db); err != nil {
+		fail(w, err, 500)
+		return
+	}
+	dest := "/transactions"
+	if ref, err := url.Parse(r.Header.Get("Referer")); err == nil && ref.Path != "" {
+		q := ref.Query()
+		q.Del("msg")
+		dest = ref.Path + "?" + q.Encode()
+	}
+	http.Redirect(w, r, dest, http.StatusSeeOther)
+}

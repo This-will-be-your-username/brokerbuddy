@@ -102,6 +102,7 @@ func openDB(path string) (*sql.DB, error) {
 	db.Exec(`ALTER TABLE transactions ADD COLUMN ignore_override INTEGER NOT NULL DEFAULT 0`)
 	db.Exec(`ALTER TABLE transactions ADD COLUMN reimb INTEGER NOT NULL DEFAULT 0`)
 	db.Exec(`ALTER TABLE transactions ADD COLUMN reimb_override INTEGER NOT NULL DEFAULT 0`)
+	db.Exec(`ALTER TABLE transactions ADD COLUMN flipped INTEGER NOT NULL DEFAULT 0`) // 1 = the user reversed debit/credit
 	db.Exec(`ALTER TABLE accounts ADD COLUMN is_card INTEGER NOT NULL DEFAULT 0`)
 	db.Exec(`UPDATE transactions SET confidence=100, cat_source='manual' WHERE manual=1 AND confidence<100`)
 	return db, nil

@@ -125,6 +125,7 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("POST /accounts/flag", a.flagAccount)
 	mux.HandleFunc("POST /settings/cards", a.saveCardSettings)
 	mux.HandleFunc("POST /txn/ignore", a.setIgnoreOverride)
+	mux.HandleFunc("POST /txn/flip", a.flipDirection)
 	mux.HandleFunc("POST /txn/reimb", a.setReimb)
 	mux.HandleFunc("POST /settings/reimb", a.saveReimbSettings)
 	// settings & sign-in
@@ -192,6 +193,7 @@ type txnRow struct {
 	ReimbHeld                                 bool   // flagged, but not yet matched to a spending category
 	CanReimb                                  bool   // a credit that could be flagged as a repayment
 	Level, Why                                string // confidence level (confirmed/high/medium/low/unknown) and the reason
+	Flipped                                   bool   // debit/credit was reversed by the user
 }
 
 type confChip struct {
