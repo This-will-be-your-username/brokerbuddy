@@ -75,8 +75,9 @@ func newApp(dbPath string) (*app, error) {
 
 func parseTemplates() *template.Template {
 	return template.Must(template.New("").Funcs(template.FuncMap{
-		"neg":  func(f float64) float64 { return -f },
-		"list": func(v ...int) []int { return v },
+		"neg":   func(f float64) float64 { return -f },
+		"list":  func(v ...int) []int { return v },
+		"money": fmtMoney,
 		"pct": func(f, max float64) float64 {
 			if max <= 0 {
 				return 0
@@ -211,103 +212,6 @@ type itemView struct {
 type ruleView struct {
 	ID                int
 	Pattern, Category string
-}
-
-func (a *app) index(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
-	cat, search, conf := q.Get("category"), q.Get("q"), q.Get("confidence")
-
-	where, args := []string{"1=1"}, []any{}
-	if cat != "" {
-		where = append(where, "t.category=?")
-		args = append(args, cat)
-	}
-	if search != "" {
-		where = append(where, "(t.name LIKE ? OR t.merchant LIKE ?)")
-		args = append(args, "%"+search+"%", "%"+search+"%")
-	}
-	baseW := strings.Join(where, " AND ") // category + search only, used for the confidence counts
-	if cc := confClause(conf); cc != "" {
-		where = append(where, cc)
-	}
-	W := strings.Join(where, " AND ")
-	order := "t.date DESC, t.plaid_txn_id"
-	if conf == "review" || conf == "low" || conf == "unknown" || conf == "medium" {
-		order = "t.confidence ASC, lower(t.name), t.date DESC" // least sure first, same merchants together
-	}
-
-	var txns []txnRow
-	rows, err := a.db.Query(`SELECT t.plaid_txn_id,t.date,t.name,a.name||CASE WHEN a.mask<>'' THEN ' ••'||a.mask ELSE '' END,t.category,t.amount,t.manual,t.cat_source,t.confidence
-		FROM transactions t JOIN accounts a ON a.plaid_account_id=t.account_id
-		WHERE `+W+` ORDER BY `+order+` LIMIT 500`, args...)
-	if err != nil {
-		fail(w, err, 500)
-		return
-	}
-	for rows.Next() {
-		var t txnRow
-		rows.Scan(&t.ID, &t.Date, &t.Name, &t.Account, &t.Category, &t.Amount, &t.Manual, &t.Source, &t.Conf)
-		t.Level = confLevel(t.Conf, t.Manual, t.Category)
-		t.Why = srcWhy(t.Source, t.Manual)
-		txns = append(txns, t)
-	}
-	rows.Close()
-
-	// Spending totals per category (outflows only, transfers/income excluded) for the filtered set.
-	var totals []catTotal
-	rows, err = a.db.Query(`SELECT t.category, SUM(t.amount) FROM transactions t
-		WHERE `+W+` AND t.amount>0 AND t.category NOT IN ('Transfers','Savings & Investments','Salary & Wages','Government Benefits','Rental Income','Other Income')
-		GROUP BY t.category ORDER BY 2 DESC`, args...)
-	if err == nil {
-		for rows.Next() {
-			var c catTotal
-			rows.Scan(&c.Category, &c.Total)
-			totals = append(totals, c)
-		}
-		rows.Close()
-	}
-
-	catList := allCategories()
-
-	// Confidence chips: how many transactions sit at each level (for the current search/category).
-	var nConfirmed, nHigh, nMedium, nLow, nUnknown int
-	a.db.QueryRow(`SELECT
-		COALESCE(SUM(t.manual=1),0),
-		COALESCE(SUM(t.manual=0 AND t.confidence>=80 AND t.category<>'Uncategorized'),0),
-		COALESCE(SUM(t.manual=0 AND t.confidence BETWEEN 50 AND 79 AND t.category<>'Uncategorized'),0),
-		COALESCE(SUM(t.manual=0 AND t.confidence BETWEEN 1 AND 49 AND t.category<>'Uncategorized'),0),
-		COALESCE(SUM(t.manual=0 AND (t.confidence=0 OR t.category='Uncategorized')),0)
-		FROM transactions t WHERE `+baseW, args...).Scan(&nConfirmed, &nHigh, &nMedium, &nLow, &nUnknown)
-	chipURL := func(level string) string {
-		v := url.Values{}
-		if search != "" {
-			v.Set("q", search)
-		}
-		if cat != "" {
-			v.Set("category", cat)
-		}
-		if level != "" {
-			v.Set("confidence", level)
-		}
-		if len(v) == 0 {
-			return "/transactions"
-		}
-		return "/transactions?" + v.Encode()
-	}
-	chips := []confChip{
-		{"All", "all", chipURL(""), nConfirmed + nHigh + nMedium + nLow + nUnknown, conf == ""},
-		{"Needs review", "review", chipURL("review"), nLow + nUnknown, conf == "review"},
-		{"Unknown", "unknown", chipURL("unknown"), nUnknown, conf == "unknown"},
-		{"Low", "low", chipURL("low"), nLow, conf == "low"},
-		{"Medium", "medium", chipURL("medium"), nMedium, conf == "medium"},
-		{"High", "high", chipURL("high"), nHigh, conf == "high"},
-		{"Confirmed", "confirmed", chipURL("confirmed"), nConfirmed, conf == "confirmed"},
-	}
-
-	a.tpl.ExecuteTemplate(w, "index.html", map[string]any{
-		"Txns": txns, "Totals": totals, "Cats": catList, "Max": maxTotal(totals),
-		"Category": cat, "Q": search, "Conf": conf, "Chips": chips, "PlaidReady": a.pc() != nil, "Flash": q.Get("msg"),
-	})
 }
 
 func sortStrings(s []string) {

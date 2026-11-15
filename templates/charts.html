@@ -72,6 +72,7 @@ const $ = id => document.getElementById(id);
 
 const res = await fetch('/api/transactions'); const API = await res.json();
 const groupOf = {}; API.categories.forEach(c => groupOf[c.Name] = c.Group);
+const acctName = {}; API.accounts.forEach(a => acctName[a.ID] = a.Name);
 const T = API.txns.map(r => ({ date: r[0], amt: r[1], cat: r[2], acct: r[3], name: r[4], grp: groupOf[r[2]] || 'Discretionary' }));
 if (!T.length) { document.querySelector('.charts').innerHTML = '<div class="card wide">No transactions yet. <a href="/import">Import a CSV</a> first.</div>'; return; }
 const minDate = T[0].date, maxDate = T[T.length-1].date;
@@ -235,8 +236,8 @@ function update() {
   // biggest transactions
   const big = [...exp].sort((a, b) => b.amt - a.amt).slice(0, 10);
   const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  $('big').innerHTML = '<tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th></tr>' +
-    big.map(t => `<tr><td class="mut" style="white-space:nowrap">${t.date}</td><td class="grow"><div class="clamp" title="${esc(t.name)}">${esc(t.name)}</div></td><td>${esc(t.cat)}</td><td class="amt">${money(t.amt)}</td></tr>`).join('');
+  $('big').innerHTML = '<tr><th>Date</th><th>Description</th><th>Account</th><th>Category</th><th style="text-align:right">Amount</th></tr>' +
+    big.map(t => `<tr><td class="mut" style="white-space:nowrap">${t.date}</td><td class="grow"><div class="clamp" title="${esc(t.name)}">${esc(t.name)}</div></td><td>${esc(acctName[t.acct] || '')}</td><td>${esc(t.cat)}</td><td class="amt">${money(t.amt)}</td></tr>`).join('');
   if (window.bbClamp) bbClamp($('big')); // collapse long descriptions
 }
 update();

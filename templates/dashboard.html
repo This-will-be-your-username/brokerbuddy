@@ -38,7 +38,7 @@
     {{range .Top}}<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between"><a href="/transactions?category={{.Category}}">{{.Category}}</a><span>${{printf "%.0f" .Monthly}} · {{printf "%.0f" .Pct}}%</span></div><div class="bar" style="width:{{printf "%.0f" .Pct}}%"></div></div>{{end}}
   </div>
   <div class="card scroll"><h2>Recent transactions</h2>
-    <table>{{range .Recent}}<tr><td>{{.Date}}</td><td class="grow"><div class="clamp" title="{{.Name}}">{{.Name}}</div><div class="mut small">{{.Category}}</div></td><td class="amt {{if lt .Amount 0.0}}in{{else}}out{{end}}">{{printf "%.2f" (neg .Amount)}}</td></tr>{{end}}</table>
+    <table>{{range .Recent}}<tr><td>{{.Date}}</td><td class="grow"><div class="clamp" title="{{.Name}}">{{.Name}}</div><div class="mut small">{{.Category}} · {{.Account}}</div></td><td class="amt {{if lt .Amount 0.0}}in{{else}}out{{end}}">{{printf "%.2f" (neg .Amount)}}</td></tr>{{end}}</table>
     <p><a href="/transactions">All transactions →</a></p>
   </div>
 </div>

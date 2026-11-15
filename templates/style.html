@@ -81,9 +81,13 @@ th.n,td.n,td.amt{text-align:right;font-variant-numeric:tabular-nums}
 /* long text collapses to one line; click (or Enter) on a truncated one to expand it */
 td.grow{width:100%;max-width:0;min-width:150px}
 .clamp{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.clamp.over{cursor:pointer}
+.clamp.over{cursor:pointer;position:relative;padding-right:24px}
 .clamp.over:hover{color:var(--fg)}
+/* chevron at the end of the line: down = more to show, up = expanded */
+.clamp.over::after{content:"";position:absolute;right:8px;top:50%;width:6px;height:6px;margin-top:-6px;border-right:2px solid var(--mut);border-bottom:2px solid var(--mut);transform:rotate(45deg);transition:transform .15s}
+.clamp.over:hover::after,.clamp.over:focus-visible::after{border-color:var(--fg)}
 .clamp.open{white-space:normal;overflow:visible;overflow-wrap:anywhere}
+.clamp.open::after{top:.6em;margin-top:0;transform:rotate(-135deg)}
 
 /* confidence pills */
 .conf{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:500;border:1px solid currentColor;white-space:nowrap}
@@ -95,6 +99,8 @@ td.grow{width:100%;max-width:0;min-width:150px}
 .chip:hover{background:var(--soft);text-decoration:none;color:var(--fg)}
 .chip.on{background:var(--acc);border-color:var(--acc);color:var(--acc-fg)}.chip.on b{color:var(--acc-fg)}
 button.confirm{padding:2px 9px;color:var(--pos);border-color:var(--line)}
+
+.badge{display:inline-block;min-width:18px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--acc);color:var(--acc-fg);font-size:12px;line-height:18px;text-align:center}
 
 /* top navigation */
 nav.top{display:flex;gap:2px;flex-wrap:wrap;align-items:center;padding:14px 0;margin-bottom:12px}
