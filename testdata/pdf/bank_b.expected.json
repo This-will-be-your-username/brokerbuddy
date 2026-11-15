@@ -1,0 +1,122 @@
+[
+ {
+  "date": "2025-11-01",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2116
+ },
+ {
+  "date": "2025-11-02",
+  "desc": "BUNNINGS 7788 PENRITH",
+  "debit": 54.87,
+  "credit": 0
+ },
+ {
+  "date": "2025-11-03",
+  "desc": "AGL ENERGY",
+  "debit": 164.15,
+  "credit": 0
+ },
+ {
+  "date": "2025-11-05",
+  "desc": "AGL ENERGY",
+  "debit": 144.36,
+  "credit": 0
+ },
+ {
+  "date": "2025-11-06",
+  "desc": "UBER *TRIP",
+  "debit": 19.78,
+  "credit": 0
+ },
+ {
+  "date": "2025-11-08",
+  "desc": "UBER *TRIP",
+  "debit": 17.89,
+  "credit": 0
+ },
+ {
+  "date": "2025-11-09",
+  "desc": "ALDI STORES 88",
+  "debit": 115,
+  "credit": 0
+ },
+ {
+  "date": "2025-11-11",
+  "desc": "UBER *TRIP",
+  "debit": 23.65,
+  "credit": 0
+ },
+ {
+  "date": "2025-11-12",
+  "desc": "ALDI STORES 88",
+  "debit": 99,
+  "credit": 0
+ },
+ {
+  "date": "2025-11-14",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2350
+ },
+ {
+  "date": "2025-11-15",
+  "desc": "ALDI STORES 88",
+  "debit": 105.01,
+  "credit": 0
+ },
+ {
+  "date": "2025-11-16",
+  "desc": "ALDI STORES 88",
+  "debit": 83.64,
+  "credit": 0
+ },
+ {
+  "date": "2025-11-18",
+  "desc": "TELSTRA",
+  "debit": 72.88,
+  "credit": 0
+ },
+ {
+  "date": "2025-11-19",
+  "desc": "NETFLIX.COM",
+  "debit": 19.23,
+  "credit": 0
+ },
+ {
+  "date": "2025-11-21",
+  "desc": "STARBUCKS 22 NEWTOWN",
+  "debit": 5.55,
+  "credit": 0
+ },
+ {
+  "date": "2025-11-22",
+  "desc": "TELSTRA",
+  "debit": 94.52,
+  "credit": 0
+ },
+ {
+  "date": "2025-11-24",
+  "desc": "NETFLIX.COM",
+  "debit": 22.23,
+  "credit": 0
+ },
+ {
+  "date": "2025-11-25",
+  "desc": "UBER *TRIP",
+  "debit": 23.28,
+  "credit": 0
+ },
+ {
+  "date": "2025-11-27",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2268
+ },
+ {
+  "date": "2025-11-28",
+  "desc": "ALDI STORES 88",
+  "debit": 77.29,
+  "credit": 0
+ }
+]

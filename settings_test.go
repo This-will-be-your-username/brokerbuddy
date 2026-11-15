@@ -1,6 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"io"
+	"math"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
@@ -8,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -286,4 +291,99 @@ func TestListenersReconfigureAtRuntime(t *testing.T) {
 	}
 	a.setSetting("net_mode", "local")
 	a.net.Reapply()
+}
+
+func multipartUpload(t *testing.T, c *testClient, path, field, filename string, content []byte, extra map[string]string) *http.Response {
+	t.Helper()
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	fw, _ := mw.CreateFormFile(field, filename)
+	fw.Write(content)
+	for k, v := range extra {
+		mw.WriteField(k, v)
+	}
+	mw.Close()
+	req, _ := http.NewRequest("POST", c.srv.URL+path, &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Origin", c.srv.URL)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp
+}
+
+func TestPDFImportEndToEnd(t *testing.T) {
+	a := testApp(t)
+	c := newClient(t, a)
+	pdfBytes, err := os.ReadFile(filepath.Join("testdata", "pdf", "bank_a.pdf"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp := multipartUpload(t, c, "/import/upload", "file", "statement.pdf", pdfBytes, nil)
+	body, _ := io.ReadAll(resp.Body)
+	html := string(body)
+	if resp.StatusCode != 200 || !strings.Contains(html, "Read 46 transactions") || !strings.Contains(html, "Table found by its header row") {
+		t.Fatalf("mapping page: %d\n%.600s", resp.StatusCode, html)
+	}
+	tok := regexp.MustCompile(`name="token" value="([a-f0-9]{32})"`).FindStringSubmatch(html)
+	if tok == nil {
+		t.Fatal("no token on mapping page")
+	}
+	// the guessed mapping must be a valid debit/credit mapping on the ISO date layout
+	if !strings.Contains(html, "2025-10-01") && !strings.Contains(html, "SALARY ACME") {
+		t.Errorf("preview rows missing")
+	}
+	form := url.Values{"token": {tok[1]}, "date": {"0"}, "layout": {"0"}, "desc": {"1"}, "desc2": {"-1"}, "category": {"-1"},
+		"mode": {"split"}, "amount": {"-1"}, "debit": {"2"}, "credit": {"3"}, "account": {"new"}, "new_name": {"Test Account"}, "action": {"import"}}
+	r2 := c.post("/import/run", form)
+	if r2.StatusCode != 303 || !strings.Contains(r2.Header.Get("Location"), "Imported+46") {
+		t.Fatalf("import: %d %s", r2.StatusCode, r2.Header.Get("Location"))
+	}
+	var n int
+	var out, in float64
+	a.db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(CASE WHEN amount>0 THEN amount END),0), COALESCE(-SUM(CASE WHEN amount<0 THEN amount END),0) FROM transactions`).Scan(&n, &out, &in)
+	_, exp := loadFixture(t, "bank_a")
+	var wantOut, wantIn float64
+	for _, e := range exp {
+		wantOut += e.Debit
+		wantIn += e.Credit
+	}
+	if n != 46 || math.Abs(out-wantOut) > 0.01 || math.Abs(in-wantIn) > 0.01 {
+		t.Errorf("stored %d txns out %.2f in %.2f; want 46, %.2f, %.2f", n, out, in, wantOut, wantIn)
+	}
+	// SALARY ACME credits are recognised as income; merchants are categorised by the dictionary
+	var salary, groceries int
+	a.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE category='Salary & Wages'`).Scan(&salary)
+	a.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE category='Groceries'`).Scan(&groceries)
+	if salary == 0 || groceries == 0 {
+		t.Errorf("categorisation after PDF import: salary=%d groceries=%d", salary, groceries)
+	}
+	// importing the same statement again adds nothing
+	resp = multipartUpload(t, c, "/import/upload", "file", "statement.pdf", pdfBytes, nil)
+	body, _ = io.ReadAll(resp.Body)
+	tok = regexp.MustCompile(`name="token" value="([a-f0-9]{32})"`).FindStringSubmatch(string(body))
+	var acct string
+	a.db.QueryRow(`SELECT plaid_account_id FROM accounts LIMIT 1`).Scan(&acct)
+	form.Set("token", tok[1])
+	form.Set("account", acct)
+	if r3 := c.post("/import/run", form); !strings.Contains(r3.Header.Get("Location"), "Imported+0") {
+		t.Errorf("re-import should add nothing: %s", r3.Header.Get("Location"))
+	}
+}
+
+func TestPDFUploadErrorsAreFriendly(t *testing.T) {
+	a := testApp(t)
+	c := newClient(t, a)
+	scan, _ := os.ReadFile(filepath.Join("testdata", "pdf", "scan_i.pdf"))
+	resp := multipartUpload(t, c, "/import/upload", "file", "scan.pdf", scan, nil)
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 400 || !strings.Contains(string(body), "scanned image") {
+		t.Errorf("scan: %d %.300s", resp.StatusCode, body)
+	}
+	resp = multipartUpload(t, c, "/import/upload", "file", "x.pdf", []byte("%PDF-1.4 junk"), nil)
+	body, _ = io.ReadAll(resp.Body)
+	if resp.StatusCode != 400 || !strings.Contains(string(body), "couldn&#39;t read this PDF") && !strings.Contains(string(body), "couldn't read this PDF") {
+		t.Errorf("junk: %d %.300s", resp.StatusCode, body)
+	}
 }

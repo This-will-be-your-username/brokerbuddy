@@ -2,6 +2,7 @@ package main
 
 import (
 	"net"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"strconv"
@@ -22,7 +23,11 @@ func TestBrowserHarness(t *testing.T) {
 		t.Fatal(err)
 	}
 	a.net = newNetManager(a, nil, "127.0.0.1:8765") // not started: lets the Settings page show status
-	srv := httptest.NewUnstartedServer(a.routes())
+	// test-only: serve the PDF fixtures so a page script can upload one
+	mux := http.NewServeMux()
+	mux.Handle("/__fixtures/", http.StripPrefix("/__fixtures/", http.FileServer(http.Dir("testdata"))))
+	mux.Handle("/", a.routes())
+	srv := httptest.NewUnstartedServer(mux)
 	l, err := newLocalListener("127.0.0.1:8765")
 	if err != nil {
 		t.Fatal(err)

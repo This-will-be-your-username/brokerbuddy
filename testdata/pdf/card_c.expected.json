@@ -1,0 +1,146 @@
+[
+ {
+  "date": "2025-10-01",
+  "desc": "PAYMENT RECEIVED - THANK YOU",
+  "debit": 0,
+  "credit": 400
+ },
+ {
+  "date": "2025-10-02",
+  "desc": "AGL ENERGY",
+  "debit": 179.87,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-03",
+  "desc": "BUNNINGS 7788 PENRITH",
+  "debit": 71.3,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-04",
+  "desc": "TELSTRA",
+  "debit": 114.02,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-05",
+  "desc": "NETFLIX.COM",
+  "debit": 22.72,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-07",
+  "desc": "NETFLIX.COM",
+  "debit": 29.31,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-08",
+  "desc": "ALDI STORES 88",
+  "debit": 94.48,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-09",
+  "desc": "CHEMIST WAREHOUSE",
+  "debit": 39.2,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-10",
+  "desc": "WOOLWORTHS 1234 SYDNEY NSW",
+  "debit": 106.72,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-11",
+  "desc": "PAYMENT RECEIVED - THANK YOU",
+  "debit": 0,
+  "credit": 400
+ },
+ {
+  "date": "2025-10-13",
+  "desc": "PAYMENT RECEIVED - THANK YOU",
+  "debit": 0,
+  "credit": 400
+ },
+ {
+  "date": "2025-10-14",
+  "desc": "AGL ENERGY",
+  "debit": 136.29,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-15",
+  "desc": "BP 5566 PARRAMATTA",
+  "debit": 80.07,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-16",
+  "desc": "SPOTIFY",
+  "debit": 13.62,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-17",
+  "desc": "TELSTRA",
+  "debit": 103.42,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-19",
+  "desc": "STARBUCKS 22 NEWTOWN",
+  "debit": 7.57,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-20",
+  "desc": "UBER *TRIP",
+  "debit": 19.32,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-21",
+  "desc": "TELSTRA",
+  "debit": 96.29,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-22",
+  "desc": "PAYMENT RECEIVED - THANK YOU",
+  "debit": 0,
+  "credit": 400
+ },
+ {
+  "date": "2025-10-23",
+  "desc": "BUNNINGS 7788 PENRITH",
+  "debit": 60.42,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-25",
+  "desc": "WOOLWORTHS 1234 SYDNEY NSW",
+  "debit": 87.66,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-26",
+  "desc": "PAYMENT RECEIVED - THANK YOU",
+  "debit": 0,
+  "credit": 400
+ },
+ {
+  "date": "2025-10-27",
+  "desc": "BP 5566 PARRAMATTA",
+  "debit": 77.61,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-28",
+  "desc": "AGL ENERGY",
+  "debit": 125.94,
+  "credit": 0
+ }
+]

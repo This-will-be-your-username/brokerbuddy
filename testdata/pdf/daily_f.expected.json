@@ -1,0 +1,182 @@
+[
+ {
+  "date": "2025-08-01",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2180
+ },
+ {
+  "date": "2025-08-01",
+  "desc": "ALDI STORES 88",
+  "debit": 92.45,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-02",
+  "desc": "WOOLWORTHS 1234 SYDNEY NSW",
+  "debit": 89.54,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-03",
+  "desc": "NETFLIX.COM",
+  "debit": 24.71,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-04",
+  "desc": "WOOLWORTHS 1234 SYDNEY NSW",
+  "debit": 101.89,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-05",
+  "desc": "NETFLIX.COM",
+  "debit": 26.45,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-06",
+  "desc": "SPOTIFY",
+  "debit": 11.78,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-07",
+  "desc": "ATM WITHDRAWAL KING ST",
+  "debit": 239.87,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-08",
+  "desc": "ATM WITHDRAWAL KING ST",
+  "debit": 182.88,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-09",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2121
+ },
+ {
+  "date": "2025-08-10",
+  "desc": "BUNNINGS 7788 PENRITH",
+  "debit": 79.13,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-11",
+  "desc": "ALDI STORES 88",
+  "debit": 118.81,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-12",
+  "desc": "BUNNINGS 7788 PENRITH",
+  "debit": 62.63,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-13",
+  "desc": "SPOTIFY",
+  "debit": 12.38,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-14",
+  "desc": "SPOTIFY",
+  "debit": 15.2,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-15",
+  "desc": "CHEMIST WAREHOUSE",
+  "debit": 33.16,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-16",
+  "desc": "CHEMIST WAREHOUSE",
+  "debit": 28.84,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-17",
+  "desc": "NETFLIX.COM",
+  "debit": 22.76,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-18",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2036
+ },
+ {
+  "date": "2025-08-19",
+  "desc": "UBER *TRIP",
+  "debit": 16.73,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-20",
+  "desc": "WOOLWORTHS 1234 SYDNEY NSW",
+  "debit": 110.1,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-21",
+  "desc": "CHEMIST WAREHOUSE",
+  "debit": 31.51,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-22",
+  "desc": "AGL ENERGY",
+  "debit": 180.96,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-23",
+  "desc": "AGL ENERGY",
+  "debit": 164.89,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-24",
+  "desc": "CHEMIST WAREHOUSE",
+  "debit": 34.04,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-25",
+  "desc": "BP 5566 PARRAMATTA",
+  "debit": 60.98,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-26",
+  "desc": "STARBUCKS 22 NEWTOWN",
+  "debit": 5.24,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-27",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2299
+ },
+ {
+  "date": "2025-08-28",
+  "desc": "BP 5566 PARRAMATTA",
+  "debit": 81.16,
+  "credit": 0
+ },
+ {
+  "date": "2025-08-29",
+  "desc": "WOOLWORTHS 1234 SYDNEY NSW",
+  "debit": 69.1,
+  "credit": 0
+ }
+]

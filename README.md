@@ -1,6 +1,6 @@
 # BrokerBuddy
 
-A private, self-hosted money dashboard. Import bank CSVs (or link a bank through Plaid), have transactions sorted into lender-style categories, see income and spending, and estimate how much you could borrow for a home.
+A private, self-hosted money dashboard. Import bank CSVs or PDF statements (or link a bank through Plaid), have transactions sorted into lender-style categories, see income and spending, and estimate how much you could borrow for a home.
 
 ## Run
 
@@ -29,6 +29,14 @@ On first run an encryption key is generated next to the database (`brokerbuddy.d
 ## Appearance
 
 Use the **Auto / Light / Dark** control in the top bar. Auto follows your system setting. The choice is remembered per browser.
+
+## Importing PDF statements
+
+Upload a PDF on the **Import** page; the transaction table is found automatically and shown in the same mapping and preview screen as a CSV before anything is saved.
+
+How it works: text and positions are read from every page and rebuilt into lines and cells; the table is found from its header row (even when the headings wrap over several lines), or, with no header, from rows that start with a date and end in amounts; numeric columns are located by clustering the amounts' x positions and labelled from the header; wrapped descriptions are re-joined; a date shown once per day carries to the rows below; dates without a year take it from the statement period; and money in/out comes from Debit/Credit columns, `CR`/`DR` markers, or the running balance (statements may list newest first). Opening/closing balances, totals, footers and repeated headers are dropped.
+
+Limits: text-based PDFs only (a scan or photo has no text and needs OCR, which isn't included); password-protected files need the password entered on the upload form (it is used once and not stored); PDF 2.0 files and statements that combine several accounts with different column layouts in one file may not read correctly. Always check the preview, and use the CSV export when your bank offers one. Re-importing a statement is safe: duplicates are skipped.
 
 ## CSV import (no bank API needed)
 

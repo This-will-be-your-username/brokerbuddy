@@ -1,0 +1,110 @@
+[
+ {
+  "date": "2025-09-28",
+  "desc": "ALDI STORES 88",
+  "debit": 114.34,
+  "credit": 0
+ },
+ {
+  "date": "2025-09-26",
+  "desc": "CHEMIST WAREHOUSE",
+  "debit": 42.66,
+  "credit": 0
+ },
+ {
+  "date": "2025-09-25",
+  "desc": "SPOTIFY",
+  "debit": 12.17,
+  "credit": 0
+ },
+ {
+  "date": "2025-09-23",
+  "desc": "CHEMIST WAREHOUSE",
+  "debit": 43.59,
+  "credit": 0
+ },
+ {
+  "date": "2025-09-21",
+  "desc": "NETFLIX.COM",
+  "debit": 28.69,
+  "credit": 0
+ },
+ {
+  "date": "2025-09-20",
+  "desc": "BP 5566 PARRAMATTA",
+  "debit": 86.29,
+  "credit": 0
+ },
+ {
+  "date": "2025-09-18",
+  "desc": "AGL ENERGY",
+  "debit": 162.22,
+  "credit": 0
+ },
+ {
+  "date": "2025-09-17",
+  "desc": "AGL ENERGY",
+  "debit": 136.65,
+  "credit": 0
+ },
+ {
+  "date": "2025-09-15",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2178
+ },
+ {
+  "date": "2025-09-13",
+  "desc": "CHEMIST WAREHOUSE",
+  "debit": 40.68,
+  "credit": 0
+ },
+ {
+  "date": "2025-09-12",
+  "desc": "BP 5566 PARRAMATTA",
+  "debit": 61.16,
+  "credit": 0
+ },
+ {
+  "date": "2025-09-10",
+  "desc": "SPOTIFY",
+  "debit": 14.76,
+  "credit": 0
+ },
+ {
+  "date": "2025-09-09",
+  "desc": "NETFLIX.COM",
+  "debit": 19.74,
+  "credit": 0
+ },
+ {
+  "date": "2025-09-07",
+  "desc": "STARBUCKS 22 NEWTOWN",
+  "debit": 8.39,
+  "credit": 0
+ },
+ {
+  "date": "2025-09-05",
+  "desc": "BUNNINGS 7788 PENRITH",
+  "debit": 51.16,
+  "credit": 0
+ },
+ {
+  "date": "2025-09-04",
+  "desc": "SPOTIFY",
+  "debit": 15.04,
+  "credit": 0
+ },
+ {
+  "date": "2025-09-02",
+  "desc": "BP 5566 PARRAMATTA",
+  "debit": 76.48,
+  "credit": 0
+ },
+ {
+  "date": "2025-09-01",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2164
+ }
+]

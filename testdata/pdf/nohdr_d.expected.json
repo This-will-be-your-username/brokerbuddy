@@ -1,0 +1,98 @@
+[
+ {
+  "date": "2025-12-01",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2148
+ },
+ {
+  "date": "2025-12-02",
+  "desc": "WOOLWORTHS 1234 SYDNEY NSW",
+  "debit": 99.44,
+  "credit": 0
+ },
+ {
+  "date": "2025-12-04",
+  "desc": "CHEMIST WAREHOUSE",
+  "debit": 37.59,
+  "credit": 0
+ },
+ {
+  "date": "2025-12-06",
+  "desc": "TELSTRA",
+  "debit": 93.07,
+  "credit": 0
+ },
+ {
+  "date": "2025-12-08",
+  "desc": "TELSTRA",
+  "debit": 79.2,
+  "credit": 0
+ },
+ {
+  "date": "2025-12-10",
+  "desc": "NETFLIX.COM",
+  "debit": 24.53,
+  "credit": 0
+ },
+ {
+  "date": "2025-12-11",
+  "desc": "ALDI STORES 88",
+  "debit": 122.11,
+  "credit": 0
+ },
+ {
+  "date": "2025-12-13",
+  "desc": "ALDI STORES 88",
+  "debit": 96.25,
+  "credit": 0
+ },
+ {
+  "date": "2025-12-15",
+  "desc": "TELSTRA",
+  "debit": 86.44,
+  "credit": 0
+ },
+ {
+  "date": "2025-12-17",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2235
+ },
+ {
+  "date": "2025-12-19",
+  "desc": "WOOLWORTHS 1234 SYDNEY NSW",
+  "debit": 100.06,
+  "credit": 0
+ },
+ {
+  "date": "2025-12-20",
+  "desc": "ALDI STORES 88",
+  "debit": 101.22,
+  "credit": 0
+ },
+ {
+  "date": "2025-12-22",
+  "desc": "BUNNINGS 7788 PENRITH",
+  "debit": 57.17,
+  "credit": 0
+ },
+ {
+  "date": "2025-12-24",
+  "desc": "STARBUCKS 22 NEWTOWN",
+  "debit": 7.22,
+  "credit": 0
+ },
+ {
+  "date": "2025-12-26",
+  "desc": "NETFLIX.COM",
+  "debit": 22.3,
+  "credit": 0
+ },
+ {
+  "date": "2025-12-28",
+  "desc": "ATM WITHDRAWAL KING ST",
+  "debit": 253.46,
+  "credit": 0
+ }
+]

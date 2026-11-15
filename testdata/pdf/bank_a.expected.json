@@ -1,0 +1,278 @@
+[
+ {
+  "date": "2025-10-01",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2100
+ },
+ {
+  "date": "2025-10-01",
+  "desc": "UBER *TRIP",
+  "debit": 17.67,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-02",
+  "desc": "ATM WITHDRAWAL KING ST",
+  "debit": 236.57,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-02",
+  "desc": "STARBUCKS 22 NEWTOWN",
+  "debit": 8.14,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-03",
+  "desc": "ALDI STORES 88",
+  "debit": 114.11,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-04",
+  "desc": "UBER *TRIP",
+  "debit": 21.68,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-04",
+  "desc": "ALDI STORES 88",
+  "debit": 87.37,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-05",
+  "desc": "BUNNINGS 7788 PENRITH",
+  "debit": 59.98,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-06",
+  "desc": "BUNNINGS 7788 PENRITH",
+  "debit": 50.93,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-06",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2008
+ },
+ {
+  "date": "2025-10-07",
+  "desc": "UBER *TRIP",
+  "debit": 23.66,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-07",
+  "desc": "TELSTRA",
+  "debit": 113.67,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-08",
+  "desc": "SPOTIFY",
+  "debit": 14.35,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-09",
+  "desc": "STARBUCKS 22 NEWTOWN",
+  "debit": 7.8,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-09",
+  "desc": "ATM WITHDRAWAL KING ST",
+  "debit": 209.16,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-10",
+  "desc": "NETFLIX.COM",
+  "debit": 22.06,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-11",
+  "desc": "NETFLIX.COM",
+  "debit": 20.06,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-11",
+  "desc": "SPOTIFY",
+  "debit": 13.66,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-12",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2126
+ },
+ {
+  "date": "2025-10-12",
+  "desc": "ATM WITHDRAWAL KING ST",
+  "debit": 229.67,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-13",
+  "desc": "BUNNINGS 7788 PENRITH",
+  "debit": 53.76,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-14",
+  "desc": "BP 5566 PARRAMATTA",
+  "debit": 83.87,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-14",
+  "desc": "ALDI STORES 88",
+  "debit": 91.2,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-15",
+  "desc": "SPOTIFY",
+  "debit": 12.18,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-16",
+  "desc": "BUNNINGS 7788 PENRITH",
+  "debit": 51.3,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-16",
+  "desc": "BP 5566 PARRAMATTA",
+  "debit": 77.36,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-17",
+  "desc": "SPOTIFY",
+  "debit": 13.16,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-18",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2086
+ },
+ {
+  "date": "2025-10-18",
+  "desc": "UBER *TRIP",
+  "debit": 21.91,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-19",
+  "desc": "SPOTIFY",
+  "debit": 15.8,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-19",
+  "desc": "BP 5566 PARRAMATTA",
+  "debit": 83,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-20",
+  "desc": "CHEMIST WAREHOUSE",
+  "debit": 41.78,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-21",
+  "desc": "BUNNINGS 7788 PENRITH",
+  "debit": 73.74,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-21",
+  "desc": "AGL ENERGY",
+  "debit": 126.88,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-22",
+  "desc": "UBER *TRIP",
+  "debit": 17.56,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-23",
+  "desc": "CHEMIST WAREHOUSE",
+  "debit": 33.4,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-23",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2259
+ },
+ {
+  "date": "2025-10-24",
+  "desc": "ATM WITHDRAWAL KING ST",
+  "debit": 226.74,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-24",
+  "desc": "UBER *TRIP",
+  "debit": 21.92,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-25",
+  "desc": "BP 5566 PARRAMATTA",
+  "debit": 76.67,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-26",
+  "desc": "NETFLIX.COM",
+  "debit": 22.54,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-26",
+  "desc": "ATM WITHDRAWAL KING ST",
+  "debit": 195.08,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-27",
+  "desc": "UBER *TRIP",
+  "debit": 16.19,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-28",
+  "desc": "BP 5566 PARRAMATTA",
+  "debit": 91.19,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-28",
+  "desc": "ALDI STORES 88",
+  "debit": 103.52,
+  "credit": 0
+ },
+ {
+  "date": "2025-10-29",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2336
+ }
+]

@@ -1,0 +1,158 @@
+[
+ {
+  "date": "2025-06-01",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2212
+ },
+ {
+  "date": "2025-06-02",
+  "desc": "BUNNINGS 7788 PENRITH",
+  "debit": 79.28,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-03",
+  "desc": "NETFLIX.COM",
+  "debit": 22.87,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-04",
+  "desc": "UBER *TRIP",
+  "debit": 20.09,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-05",
+  "desc": "ALDI STORES 88",
+  "debit": 95.95,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-06",
+  "desc": "BUNNINGS 7788 PENRITH",
+  "debit": 77.93,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-07",
+  "desc": "SPOTIFY",
+  "debit": 12.81,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-08",
+  "desc": "AGL ENERGY",
+  "debit": 127.69,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-09",
+  "desc": "UBER *TRIP",
+  "debit": 15.61,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-11",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2006
+ },
+ {
+  "date": "2025-06-12",
+  "desc": "ALDI STORES 88",
+  "debit": 80.34,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-13",
+  "desc": "CHEMIST WAREHOUSE",
+  "debit": 31.25,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-14",
+  "desc": "NETFLIX.COM",
+  "debit": 24.79,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-15",
+  "desc": "NETFLIX.COM",
+  "debit": 26.65,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-16",
+  "desc": "STARBUCKS 22 NEWTOWN",
+  "debit": 7.82,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-17",
+  "desc": "AGL ENERGY",
+  "debit": 167.25,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-18",
+  "desc": "ALDI STORES 88",
+  "debit": 99.68,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-19",
+  "desc": "BP 5566 PARRAMATTA",
+  "debit": 78.88,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-21",
+  "desc": "SALARY ACME PTY LTD",
+  "debit": 0,
+  "credit": 2320
+ },
+ {
+  "date": "2025-06-22",
+  "desc": "ATM WITHDRAWAL KING ST",
+  "debit": 245.54,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-23",
+  "desc": "CHEMIST WAREHOUSE",
+  "debit": 32.89,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-24",
+  "desc": "ATM WITHDRAWAL KING ST",
+  "debit": 205.54,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-25",
+  "desc": "NETFLIX.COM",
+  "debit": 20.81,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-26",
+  "desc": "CHEMIST WAREHOUSE",
+  "debit": 40.15,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-27",
+  "desc": "STARBUCKS 22 NEWTOWN",
+  "debit": 6.97,
+  "credit": 0
+ },
+ {
+  "date": "2025-06-28",
+  "desc": "CHEMIST WAREHOUSE",
+  "debit": 29.19,
+  "credit": 0
+ }
+]
