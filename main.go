@@ -112,6 +112,7 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("POST /rules/delete", a.deleteRule)
 	mux.HandleFunc("POST /items/delete", a.deleteItem)
 	mux.HandleFunc("POST /lookup", a.lookupUnknown)
+	mux.HandleFunc("POST /api/suggest", a.suggestPage)
 	mux.HandleFunc("POST /lookup/delete", a.lookupDelete)
 	mux.HandleFunc("POST /recategorize", a.recategorize)
 	mux.HandleFunc("GET /report", a.reportPage)

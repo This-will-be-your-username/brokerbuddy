@@ -46,6 +46,11 @@ CREATE TABLE IF NOT EXISTS csv_profiles (
 	mapping TEXT NOT NULL,
 	account_id TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS suggestion_cache (
+	key TEXT PRIMARY KEY,                -- cleaned merchant name searched online
+	json TEXT NOT NULL DEFAULT '[]',
+	at TEXT NOT NULL DEFAULT ''
+);
 CREATE TABLE IF NOT EXISTS merchant_cache (
 	key TEXT PRIMARY KEY,                -- cleaned merchant name
 	category TEXT NOT NULL DEFAULT '',    -- empty = looked up, nothing found

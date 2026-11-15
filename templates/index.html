@@ -19,6 +19,8 @@
 .acct{max-width:170px}
 tr.ign td{opacity:.6}
 tr.ign td:last-child,tr.ign td:nth-child(4){opacity:1}
+.sugpanel{margin-top:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--soft);display:flex;flex-direction:column;gap:6px}
+.sugform{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 button.small-btn{padding:1px 9px;font-size:12px}
 .pager{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 </style>
@@ -106,6 +108,7 @@ button.small-btn{padding:1px 9px;font-size:12px}
           <label class="mut small" title="Also remember this as a rule for this merchant"><input type="checkbox" name="make_rule"> rule</label>
         </form>
         <span class="conf conf-{{.Level}}" title="{{.Why}}">{{if eq .Level "confirmed"}}confirmed{{else if eq .Level "unknown"}}unknown{{else}}{{.Level}} · {{.Conf}}{{end}}</span>
+        {{if and (not .Ignored) (or (eq .Level "unknown") (eq .Level "low"))}}<button type="button" class="small-btn suggest-btn" data-id="{{.ID}}" aria-expanded="false" title="Show suggested categories with a likelihood score">Suggest ▾</button>{{end}}
         {{if .Ignored}}<span class="pill" title="{{.IgnoreWhy}}">ignored</span>
         <form class="inline" method="post" action="/txn/ignore"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="mode" value="include"><button class="small-btn" title="Count this transaction in the analysis anyway">Count it</button></form>
         {{else if eq .Override -1}}<span class="pill" title="You chose to count this although it would normally be ignored">counted anyway</span>
@@ -127,6 +130,75 @@ button.small-btn{padding:1px 9px;font-size:12px}
 <datalist id="cats">{{range .Cats}}<option value="{{.}}">{{end}}</datalist>
 </main>
 
+<script>
+// "Suggest": a dropdown of likely categories with a score, plus a box to type your own.
+// "Search online" adds candidates from Wikipedia; only the cleaned merchant name is sent.
+(function () {
+  var cats = Array.prototype.map.call(document.querySelectorAll('#cats option'), function (o) { return o.value; });
+  function el(tag, attrs, text) {
+    var e = document.createElement(tag);
+    for (var k in (attrs || {})) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function load(btn, panel, web) {
+    var body = new URLSearchParams({id: btn.dataset.id});
+    if (web) body.set('web', '1');
+    panel.textContent = web ? 'Searching online…' : 'Loading…';
+    fetch('/api/suggest', {method: 'POST', body: body}).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (d) { render(btn, panel, d, web); }).catch(function (e) { panel.textContent = 'Could not load suggestions: ' + e.message; });
+  }
+  function render(btn, panel, d, searched) {
+    panel.textContent = '';
+    var form = el('form', {method: 'post', action: '/txn/category', 'class': 'sugform'});
+    form.appendChild(el('input', {type: 'hidden', name: 'id', value: btn.dataset.id}));
+    var sel = el('select', {name: 'category', 'aria-label': 'Suggested category'});
+    (d.options || []).forEach(function (o) {
+      sel.appendChild(el('option', {value: o.category, title: o.why}, o.category + ' — ' + o.score + '%'));
+    });
+    if (!sel.options.length) sel.appendChild(el('option', {value: ''}, 'No suggestions'));
+    form.appendChild(sel);
+    var own = el('input', {type: 'text', list: 'cats', placeholder: 'or type your own', size: '18', 'aria-label': 'Your own category'});
+    form.appendChild(own);
+    var rule = el('label', {'class': 'mut small'});
+    rule.appendChild(el('input', {type: 'checkbox', name: 'make_rule'}));
+    rule.appendChild(document.createTextNode(' rule'));
+    form.appendChild(rule);
+    form.appendChild(el('button', {'class': 'primary small-btn'}, 'Apply'));
+    if (!searched) {
+      var web = el('button', {type: 'button', 'class': 'small-btn', title: 'Searches Wikipedia for “' + (d.merchant || '') + '”. Only this name is sent.'}, 'Search online');
+      web.onclick = function () { load(btn, panel, true); };
+      form.appendChild(web);
+    }
+    form.addEventListener('submit', function (ev) {
+      var v = own.value.trim();
+      if (v) { sel.appendChild(el('option', {value: v})); sel.value = v; }
+      if (!sel.value) ev.preventDefault();
+    });
+    panel.appendChild(form);
+    var top = (d.options || [])[0];
+    if (top) panel.appendChild(el('div', {'class': 'mut small'}, 'Top pick: ' + top.why));
+    if (d.note) panel.appendChild(el('div', {'class': 'mut small'}, d.note));
+    if (d.error) panel.appendChild(el('div', {'class': 'small', style: 'color:var(--neg)'}, d.error));
+    sel.addEventListener('change', function () {
+      var o = sel.options[sel.selectedIndex];
+      if (o && o.title) { var n = panel.querySelector('.why'); if (!n) { n = el('div', {'class': 'mut small why'}); panel.appendChild(n); } n.textContent = o.title; }
+    });
+  }
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target.closest && ev.target.closest('.suggest-btn');
+    if (!btn) return;
+    var cell = btn.parentNode, panel = cell.querySelector('.sugpanel');
+    if (panel) { panel.remove(); btn.setAttribute('aria-expanded', 'false'); return; }
+    panel = el('div', {'class': 'sugpanel', role: 'region', 'aria-label': 'Suggested categories'});
+    cell.appendChild(panel);
+    btn.setAttribute('aria-expanded', 'true');
+    load(btn, panel, false);
+  });
+})();
+</script>
 <script>
 // The filter menu is collapsed until opened; the button shows how many filters are active.
 (function () {
