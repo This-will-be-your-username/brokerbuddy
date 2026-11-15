@@ -387,3 +387,51 @@ func TestPDFUploadErrorsAreFriendly(t *testing.T) {
 		t.Errorf("junk: %d %.300s", resp.StatusCode, body)
 	}
 }
+
+// Browsers submit plain HTML forms with whatever Origin their referrer policy allows (even "null"),
+// so the check must rely on Sec-Fetch-Site. Each case below is a real browser/client behaviour.
+func TestSameOriginCheck(t *testing.T) {
+	a := testApp(t)
+	h := a.routes()
+	cases := []struct {
+		name    string
+		headers map[string]string
+		want    int
+	}{
+		{"browser form, same origin, Origin null", map[string]string{"Sec-Fetch-Site": "same-origin", "Origin": "null"}, 303},
+		{"browser form, same origin, no Origin", map[string]string{"Sec-Fetch-Site": "same-origin"}, 303},
+		{"browser fetch, same origin", map[string]string{"Sec-Fetch-Site": "same-origin", "Origin": "https://127.0.0.1:8443"}, 303},
+		{"another site posting here", map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example.com"}, 403},
+		{"cross-site claiming our Origin", map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://127.0.0.1:8443"}, 403},
+		{"sibling subdomain", map[string]string{"Sec-Fetch-Site": "same-site"}, 403},
+		{"old client, matching Origin", map[string]string{"Origin": "https://127.0.0.1:8443"}, 303},
+		{"old client, foreign Origin", map[string]string{"Origin": "https://evil.example.com"}, 403},
+		{"old client, Origin null and no Referer", map[string]string{"Origin": "null"}, 403},
+		{"old client, matching Referer only", map[string]string{"Referer": "https://127.0.0.1:8443/settings"}, 303},
+		{"no headers at all", map[string]string{}, 403},
+	}
+	for _, c := range cases {
+		r := httptest.NewRequest("POST", "/recategorize", nil)
+		r.Host = "127.0.0.1:8443"
+		for k, v := range c.headers {
+			r.Header.Set(k, v)
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != c.want {
+			t.Errorf("%s: got %d want %d", c.name, w.Code, c.want)
+		}
+	}
+	// GET is never blocked by this check
+	r := httptest.NewRequest("GET", "/charts", nil)
+	r.Host = "127.0.0.1:8443"
+	r.Header.Set("Sec-Fetch-Site", "cross-site")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 200 {
+		t.Errorf("GET: %d", w.Code)
+	}
+	if got := w.Header().Get("Referrer-Policy"); got != "same-origin" {
+		t.Errorf("Referrer-Policy %q", got)
+	}
+}

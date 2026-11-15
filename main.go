@@ -128,17 +128,37 @@ func (a *app) routes() http.Handler {
 }
 
 // sameOrigin is CSRF protection for state-changing requests.
+//
+// Browsers label every request with Sec-Fetch-Site, a header page scripts cannot forge, so that is
+// trusted first. Origin is not reliable on its own: a plain form post can legitimately carry
+// "Origin: null" (for instance under a no-referrer policy). Clients without Sec-Fetch-Site fall
+// back to checking that Origin, or failing that Referer, names this host.
 func sameOrigin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			o := r.Header.Get("Origin")
-			if u, err := url.Parse(o); o == "" || err != nil || u.Host != r.Host {
-				http.Error(w, "cross-origin request blocked", http.StatusForbidden)
-				return
-			}
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions && !requestIsSameOrigin(r) {
+			http.Error(w, "cross-origin request blocked", http.StatusForbidden)
+			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func requestIsSameOrigin(r *http.Request) bool {
+	switch r.Header.Get("Sec-Fetch-Site") {
+	case "same-origin", "none": // "none" = typed in the address bar / bookmark, never another site
+		return true
+	case "":
+		// older client or a non-browser: fall through to the header checks
+	default: // same-site (a sibling subdomain) or cross-site
+		return false
+	}
+	for _, h := range []string{"Origin", "Referer"} {
+		if v := r.Header.Get(h); v != "" && v != "null" {
+			u, err := url.Parse(v)
+			return err == nil && u.Host == r.Host
+		}
+	}
+	return false
 }
 
 func fail(w http.ResponseWriter, err error, code int) {

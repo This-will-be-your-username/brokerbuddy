@@ -480,7 +480,7 @@ func secureHeaders(next http.Handler) http.Handler {
 		h := w.Header()
 		h.Set("Strict-Transport-Security", "max-age=31536000")
 		h.Set("X-Content-Type-Options", "nosniff")
-		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("Referrer-Policy", "same-origin") // nothing leaks to other sites, but same-site form posts keep a real Origin
 		h.Set("X-Frame-Options", "DENY")
 		next.ServeHTTP(w, r)
 	})
