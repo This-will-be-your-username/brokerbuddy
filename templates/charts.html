@@ -236,7 +236,8 @@ function update() {
   const big = [...exp].sort((a, b) => b.amt - a.amt).slice(0, 10);
   const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   $('big').innerHTML = '<tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th></tr>' +
-    big.map(t => `<tr><td>${t.date}</td><td>${esc(t.name)}</td><td>${esc(t.cat)}</td><td class="amt">${money(t.amt)}</td></tr>`).join('');
+    big.map(t => `<tr><td class="mut" style="white-space:nowrap">${t.date}</td><td class="grow"><div class="clamp" title="${esc(t.name)}">${esc(t.name)}</div></td><td>${esc(t.cat)}</td><td class="amt">${money(t.amt)}</td></tr>`).join('');
+  if (window.bbClamp) bbClamp($('big')); // collapse long descriptions
 }
 update();
 })();

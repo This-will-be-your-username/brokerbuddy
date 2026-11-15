@@ -78,6 +78,13 @@ th.n,td.n,td.amt{text-align:right;font-variant-numeric:tabular-nums}
 .pill{display:inline-block;padding:1px 9px;border-radius:999px;background:var(--soft);color:var(--mut);font-size:12px}
 .bar{height:6px;background:var(--acc);border-radius:3px;opacity:.75}
 
+/* long text collapses to one line; click (or Enter) on a truncated one to expand it */
+td.grow{width:100%;max-width:0;min-width:150px}
+.clamp{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.clamp.over{cursor:pointer}
+.clamp.over:hover{color:var(--fg)}
+.clamp.open{white-space:normal;overflow:visible;overflow-wrap:anywhere}
+
 /* top navigation */
 nav.top{display:flex;gap:2px;flex-wrap:wrap;align-items:center;padding:14px 0;margin-bottom:12px}
 nav.top a{padding:6px 12px;border-radius:10px;color:var(--mut);font-weight:500}

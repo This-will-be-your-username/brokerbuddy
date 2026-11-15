@@ -34,5 +34,25 @@
   });
   paint();
 })();
+(function () {
+  // Collapsed text (.clamp) shows an ellipsis when it overflows; mark those as expandable.
+  function mark(root) {
+    (root || document).querySelectorAll('.clamp').forEach(function (el) {
+      var open = el.classList.contains('open');
+      var over = open || el.scrollWidth > el.clientWidth + 1;
+      el.classList.toggle('over', over);
+      if (over) { el.setAttribute('role', 'button'); el.tabIndex = 0; el.setAttribute('aria-expanded', String(open)); }
+      else { el.removeAttribute('role'); el.removeAttribute('tabindex'); el.removeAttribute('aria-expanded'); }
+    });
+  }
+  window.bbClamp = mark; // pages that build tables later (Charts) call this after rendering
+  function toggle(el) { el.classList.toggle('open'); mark(el.parentNode); }
+  document.addEventListener('click', function (e) { var el = e.target.closest && e.target.closest('.clamp.over'); if (el) toggle(el); });
+  document.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('over')) { e.preventDefault(); toggle(e.target); }
+  });
+  var t; window.addEventListener('resize', function () { clearTimeout(t); t = setTimeout(function () { mark(); }, 150); });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { mark(); }); else mark();
+})();
 </script>
 {{end}}

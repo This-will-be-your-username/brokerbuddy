@@ -36,7 +36,7 @@
     {{range .Txns}}
     <tr>
       <td class="mut" style="white-space:nowrap">{{.Date}}</td>
-      <td>{{.Name}}<div class="mut small">{{.Account}}</div></td>
+      <td class="grow"><div class="clamp" title="{{.Name}}">{{.Name}}</div><div class="mut small clamp" title="{{.Account}}">{{.Account}}</div></td>
       <td>
         <form class="inline" method="post" action="/txn/category">
           <input type="hidden" name="id" value="{{.ID}}">
