@@ -115,6 +115,7 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("POST /api/suggest", a.suggestPage)
 	mux.HandleFunc("POST /lookup/delete", a.lookupDelete)
 	mux.HandleFunc("POST /recategorize", a.recategorize)
+	mux.HandleFunc("POST /api/reprocess", a.reprocessAPI)
 	mux.HandleFunc("GET /report", a.reportPage)
 	mux.HandleFunc("GET /report.csv", a.reportCSV)
 	mux.HandleFunc("GET /import", a.importPage)

@@ -99,7 +99,44 @@ section.card{scroll-margin-top:12px}
   <h2 style="margin-top:22px">Unknown merchants</h2>
   <p class="mut small">Looks up businesses the built-in list doesn't know on Wikipedia, 12 at a time. Only the cleaned business name (e.g. “bunnings”) is sent, never amounts, dates or accounts. Results are marked <span class="pill">lookup</span> on Transactions; reject any that are wrong.</p>
   <div class="row"><form class="inline" method="post" action="/lookup"><button>Look up unknown merchants</button></form>
-  <form class="inline" method="post" action="/recategorize"><button>Re-run categorisation</button></form></div>
+</div>
+
+  <h2 style="margin-top:22px">Reprocess existing transactions</h2>
+  <p class="mut small">Re-reads everything already imported with the current parsing and categorisation logic: leftover page-footer text is removed and every transaction you have not confirmed yourself is categorised again. Your confirmed categories, rules, amounts and dates are never changed. Preview first to see what would change.</p>
+  <div class="row"><button type="button" id="rp-preview">Preview changes</button><button type="button" class="primary" id="rp-apply" hidden>Apply changes</button></div>
+  <div id="rp-out" class="small" role="status" aria-live="polite" style="margin-top:8px"></div>
+  <script>
+  (function () {
+    var out = document.getElementById('rp-out'), pv = document.getElementById('rp-preview'), ap = document.getElementById('rp-apply');
+    function el(t, txt) { var e = document.createElement(t); if (txt != null) e.textContent = txt; return e; }
+    function run(apply) {
+      pv.disabled = ap.disabled = true; out.textContent = apply ? 'Reprocessing…' : 'Working out the changes…';
+      fetch('/api/reprocess', {method: 'POST', body: new URLSearchParams(apply ? {apply: '1'} : {})})
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (d) {
+          out.textContent = '';
+          var b = d.before, a = d.after;
+          out.appendChild(el('p', (d.applied ? 'Done. ' : 'Preview: ') + d.changed + ' of ' + d.examined + ' transactions ' + (d.applied ? 'changed category' : 'would change category') +
+            (d.namesCleaned ? '; ' + d.namesCleaned + ' description(s) ' + (d.applied ? 'had' : 'have') + ' page-footer text ' + (d.applied ? 'removed' : 'to remove') : '') + '.'));
+          out.appendChild(el('p', 'Unknown ' + b.Unknown + ' → ' + a.Unknown + ' · low ' + b.Low + ' → ' + a.Low + ' · medium ' + b.Medium + ' → ' + a.Medium + ' · high ' + b.High + ' → ' + a.High));
+          if (d.samples && d.samples.length) {
+            var t = el('table'), h = el('tr');
+            ['Description', 'Was', 'Becomes'].forEach(function (x) { h.appendChild(el('th', x)); });
+            t.appendChild(h);
+            d.samples.forEach(function (s) {
+              var r = el('tr'); r.appendChild(el('td', s.name)); r.appendChild(el('td', s.from + ' (' + s.fromConf + ')')); r.appendChild(el('td', s.to + ' (' + s.toConf + ')')); t.appendChild(r);
+            });
+            out.appendChild(t);
+            if (d.changed > d.samples.length) out.appendChild(el('p', 'Showing ' + d.samples.length + ' of ' + d.changed + '.'));
+          }
+          ap.hidden = d.applied || (!d.changed && !d.namesCleaned);
+          pv.disabled = ap.disabled = false;
+        }).catch(function (e) { out.textContent = 'Failed: ' + e.message; pv.disabled = ap.disabled = false; });
+    }
+    pv.onclick = function () { run(false); };
+    ap.onclick = function () { run(true); };
+  })();
+  </script>
   <div class="list" style="margin-top:8px">
     {{range .Lookups}}<div><span><strong>{{.Key}}</strong> → {{.Category}}<div class="mut small">{{.Detail}}</div></span>
       <form class="inline" method="post" action="/lookup/delete"><input type="hidden" name="key" value="{{.Key}}"><button aria-label="Reject">Reject</button></form></div>{{end}}

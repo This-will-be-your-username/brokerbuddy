@@ -105,35 +105,11 @@ func recategorizeAll(db *sql.DB) error {
 
 // recategorize returns how many transactions ended up with a different category.
 func recategorize(db *sql.DB) (int, error) {
-	cl, err := newClassifier(db)
+	plan, err := planRecategorize(db)
 	if err != nil {
 		return 0, err
 	}
-	rows, err := db.Query(`SELECT plaid_txn_id, name, merchant, plaid_category, amount, category, confidence, reimb_override FROM transactions WHERE manual=0`)
-	if err != nil {
-		return 0, err
-	}
-	type upd struct {
-		id  string
-		res result
-	}
-	var ups []upd
-	changed := 0
-	for rows.Next() {
-		var id, n, m, p, oldCat string
-		var amt float64
-		var oldConf, over int
-		if err := rows.Scan(&id, &n, &m, &p, &amt, &oldCat, &oldConf, &over); err != nil {
-			rows.Close()
-			return 0, err
-		}
-		r := cl.classifyFullWith(n, m, p, amt, over)
-		if r.Cat != oldCat {
-			changed++
-		}
-		ups = append(ups, upd{id, r})
-	}
-	rows.Close()
+	changed, ups := plan.Changed, plan.ups
 	tx, err := db.Begin()
 	if err != nil {
 		return 0, err
