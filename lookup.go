@@ -156,7 +156,7 @@ func (a *app) unknownMerchants(limit int) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	rows, err := a.db.Query(`SELECT name, SUM(amount) FROM transactions WHERE cat_source='' AND amount>0 AND manual=0 GROUP BY name`)
+	rows, err := a.db.Query(`SELECT name, SUM(amount) FROM transactions WHERE ignored=0 AND cat_source='' AND amount>0 AND manual=0 GROUP BY name`)
 	if err != nil {
 		return nil, err
 	}

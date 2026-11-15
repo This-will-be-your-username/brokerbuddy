@@ -144,7 +144,13 @@ func recategorize(db *sql.DB) (int, error) {
 			return 0, err
 		}
 	}
-	return changed, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	if _, err := recomputeIgnored(db); err != nil { // categories feed the card-repayment rule
+		return changed, err
+	}
+	return changed, nil
 }
 
 // applyToSameMerchant looks through the transaction history for other transactions from the same

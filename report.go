@@ -41,9 +41,9 @@ func (a *app) buildReport(months int) (*report, error) { return a.buildReportOpt
 func (a *app) buildReportOpt(months int, skipCurrent bool) (*report, error) {
 	rep := &report{Months: months, SkippedMonth: skipCurrent}
 	var minS, maxS *string
-	q, args := `SELECT MIN(date), MAX(date) FROM transactions`, []any{}
+	q, args := `SELECT MIN(date), MAX(date) FROM transactions WHERE ignored=0`, []any{}
 	if skipCurrent {
-		q += ` WHERE date < ?`
+		q += ` AND date < ?`
 		args = append(args, firstOfMonth(time.Now()).Format("2006-01-02"))
 	}
 	if err := a.db.QueryRow(q, args...).Scan(&minS, &maxS); err != nil || maxS == nil {
@@ -64,7 +64,7 @@ func (a *app) buildReportOpt(months int, skipCurrent bool) (*report, error) {
 		rep.SpanMonths = math.Max(1, math.Round(rawMonths*10)/10)
 	}
 
-	rows, err := a.db.Query(`SELECT category, SUM(amount), COUNT(*) FROM transactions WHERE date>=? AND date<=? GROUP BY category`, rep.From, rep.To)
+	rows, err := a.db.Query(`SELECT category, SUM(amount), COUNT(*) FROM transactions WHERE ignored=0 AND date>=? AND date<=? GROUP BY category`, rep.From, rep.To)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func (a *app) buildReportOpt(months int, skipCurrent bool) (*report, error) {
 		add("med", "Buy-now-pay-later: %d transactions, $%.2f. Many lenders count BNPL limits as debt.", l.Count, l.Total)
 	}
 	var dish int
-	a.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE date>=? AND date<=? AND (lower(name) LIKE '%dishonour%' OR lower(name) LIKE '%dishonor%' OR lower(name) LIKE '%overdrawn%')`, rep.From, rep.To).Scan(&dish)
+	a.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE ignored=0 AND date>=? AND date<=? AND (lower(name) LIKE '%dishonour%' OR lower(name) LIKE '%dishonor%' OR lower(name) LIKE '%overdrawn%')`, rep.From, rep.To).Scan(&dish)
 	if dish > 0 {
 		add("high", "%d dishonour / overdrawn entries — a common red flag.", dish)
 	} else if l := spent("Fees & Dishonours"); l.Count > 0 {

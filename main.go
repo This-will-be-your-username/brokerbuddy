@@ -115,6 +115,9 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("POST /import/upload", a.importUpload)
 	mux.HandleFunc("POST /import/run", a.importRun)
 	mux.HandleFunc("POST /accounts/delete", a.deleteAccount)
+	mux.HandleFunc("POST /accounts/flag", a.flagAccount)
+	mux.HandleFunc("POST /settings/cards", a.saveCardSettings)
+	mux.HandleFunc("POST /txn/ignore", a.setIgnoreOverride)
 	// settings & sign-in
 	mux.HandleFunc("GET /settings", a.settingsPage)
 	mux.HandleFunc("POST /settings/plaid", a.savePlaid)
@@ -172,6 +175,9 @@ type txnRow struct {
 	Amount                                    float64
 	Manual                                    bool
 	Conf                                      int
+	Ignored                                   bool // a credit card repayment that is left out of the analysis
+	Override                                  int  // -1 = counted although it would be ignored
+	IgnoreWhy                                 string
 	Level, Why                                string // confidence level (confirmed/high/medium/low/unknown) and the reason
 }
 
@@ -191,11 +197,11 @@ func confClause(f string) string {
 	case "medium":
 		return "t.manual=0 AND t.confidence BETWEEN 50 AND 79 AND t.category<>'Uncategorized'"
 	case "low":
-		return "t.manual=0 AND t.confidence BETWEEN 1 AND 49 AND t.category<>'Uncategorized'"
+		return "t.manual=0 AND t.ignored=0 AND t.confidence BETWEEN 1 AND 49 AND t.category<>'Uncategorized'" // ignored rows never need a category fixed
 	case "unknown":
-		return "t.manual=0 AND (t.confidence=0 OR t.category='Uncategorized')"
+		return "t.manual=0 AND t.ignored=0 AND (t.confidence=0 OR t.category='Uncategorized')"
 	case "review": // everything doubtful: low confidence or no category
-		return "t.manual=0 AND (t.confidence<50 OR t.category='Uncategorized')"
+		return "t.manual=0 AND t.ignored=0 AND (t.confidence<50 OR t.category='Uncategorized')"
 	}
 	return ""
 }

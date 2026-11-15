@@ -307,6 +307,7 @@ func (a *app) settingsPage(w http.ResponseWriter, r *http.Request) {
 		addr = ":443"
 	}
 	a.tpl.ExecuteTemplate(w, "settings.html", map[string]any{
+		"AllAccounts": a.accountRows(), "CardElsewhere": loadCardCtx(a.db).elsewhere, "IgnoredTotal": a.countIgnored(""),
 		"Flash": q.Get("msg"), "Error": q.Get("err"),
 		"PlaidClientID": a.getSetting("plaid_client_id"), "PlaidSecretSet": a.getSetting("plaid_secret") != "",
 		"PlaidEnv": env, "PlaidReady": a.pc() != nil,

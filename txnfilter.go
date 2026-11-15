@@ -25,6 +25,7 @@ type txnFilter struct {
 	Sort     string
 	From, To string // YYYY-MM-DD
 	Min, Max string // dollar amounts, compared with the absolute value
+	Ign      string // "" = hide ignored credit card repayments, show = include them, only = just those
 	Page     int
 }
 
@@ -85,6 +86,9 @@ func parseTxnFilter(q url.Values) txnFilter {
 	if _, ok := sortOrders[q.Get("sort")]; ok {
 		f.Sort = q.Get("sort")
 	}
+	if v := q.Get("ignored"); v == "show" || v == "only" {
+		f.Ign = v
+	}
 	if n, err := strconv.Atoi(q.Get("page")); err == nil && n > 1 {
 		f.Page = n
 	}
@@ -124,6 +128,7 @@ func (f txnFilter) values() url.Values {
 	set("to", f.To)
 	set("min", f.Min)
 	set("max", f.Max)
+	set("ignored", f.Ign)
 	return v
 }
 
@@ -205,6 +210,12 @@ func (f txnFilter) where(withConf bool) ([]string, []any) {
 	default:
 		conds, args = append(conds, "t.manual=0 AND t.cat_source=?"), append(args, f.How)
 	}
+	switch f.Ign {
+	case "":
+		conds = append(conds, "t.ignored=0")
+	case "only":
+		conds = append(conds, "t.ignored=1")
+	}
 	if withConf {
 		if cc := confClause(f.Conf); cc != "" {
 			conds = append(conds, cc)
@@ -266,6 +277,10 @@ func (f txnFilter) active(acctName map[string]string) []activeFilter {
 	if f.How != "" {
 		add("Categorised by: "+validHow[f.How], func(g *txnFilter) { g.How = "" })
 	}
+	if f.Ign != "" {
+		label := map[string]string{"show": "Including ignored", "only": "Only ignored"}[f.Ign]
+		add(label, func(g *txnFilter) { g.Ign = "" })
+	}
 	return out
 }
 
@@ -304,7 +319,7 @@ func (a *app) index(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var txns []txnRow
-	rows, err := a.db.Query(`SELECT t.plaid_txn_id,t.date,t.name,a.name||CASE WHEN a.mask<>'' THEN ' ••'||a.mask ELSE '' END,t.category,t.amount,t.manual,t.cat_source,t.confidence
+	rows, err := a.db.Query(`SELECT t.plaid_txn_id,t.date,t.name,a.name||CASE WHEN a.mask<>'' THEN ' ••'||a.mask ELSE '' END,t.category,t.amount,t.manual,t.cat_source,t.confidence,t.ignored,t.ignore_override,a.is_card
 		FROM transactions t JOIN accounts a ON a.plaid_account_id=t.account_id
 		WHERE `+W+fmt.Sprintf(` ORDER BY %s LIMIT %d OFFSET %d`, f.order(), txnPageSize, (f.Page-1)*txnPageSize), args...)
 	if err != nil {
@@ -313,7 +328,12 @@ func (a *app) index(w http.ResponseWriter, r *http.Request) {
 	}
 	for rows.Next() {
 		var t txnRow
-		rows.Scan(&t.ID, &t.Date, &t.Name, &t.Account, &t.Category, &t.Amount, &t.Manual, &t.Source, &t.Conf)
+		var ign, card int
+		rows.Scan(&t.ID, &t.Date, &t.Name, &t.Account, &t.Category, &t.Amount, &t.Manual, &t.Source, &t.Conf, &ign, &t.Override, &card)
+		t.Ignored = ign == 1
+		if t.Ignored {
+			t.IgnoreWhy = ignoreWhy(map[bool]string{true: ignoreCardPayment, false: ignorePaidElsewhere}[card == 1])
+		}
 		t.Level = confLevel(t.Conf, t.Manual, t.Category)
 		t.Why = srcWhy(t.Source, t.Manual)
 		txns = append(txns, t)
@@ -327,8 +347,8 @@ func (a *app) index(w http.ResponseWriter, r *http.Request) {
 		COALESCE(SUM(t.manual=1),0),
 		COALESCE(SUM(t.manual=0 AND t.confidence>=80 AND t.category<>'Uncategorized'),0),
 		COALESCE(SUM(t.manual=0 AND t.confidence BETWEEN 50 AND 79 AND t.category<>'Uncategorized'),0),
-		COALESCE(SUM(t.manual=0 AND t.confidence BETWEEN 1 AND 49 AND t.category<>'Uncategorized'),0),
-		COALESCE(SUM(t.manual=0 AND (t.confidence=0 OR t.category='Uncategorized')),0)
+		COALESCE(SUM(t.manual=0 AND t.ignored=0 AND t.confidence BETWEEN 1 AND 49 AND t.category<>'Uncategorized'),0),
+		COALESCE(SUM(t.manual=0 AND t.ignored=0 AND (t.confidence=0 OR t.category='Uncategorized')),0)
 		FROM transactions t WHERE `+strings.Join(baseConds, " AND "), baseArgs...).Scan(&nConfirmed, &nHigh, &nMedium, &nLow, &nUnknown)
 	setConf := func(level string) string { return f.url(func(g *txnFilter) { g.Conf = level }) }
 	chips := []confChip{
@@ -380,6 +400,13 @@ func (a *app) index(w http.ResponseWriter, r *http.Request) {
 	if f.Page < pages {
 		nextURL = f.url(func(g *txnFilter) { g.Page = f.Page + 1 })
 	}
+	// how many ignored rows are hidden by the default, so the page can say so
+	hidden := 0
+	if f.Ign == "" {
+		hc, ha := func() ([]string, []any) { g := f; g.Ign = "only"; return g.where(true) }()
+		a.db.QueryRow(`SELECT COUNT(*) FROM transactions t WHERE `+strings.Join(hc, " AND "), ha...).Scan(&hidden)
+	}
+	showIgnoredURL := f.url(func(g *txnFilter) { g.Ign = "show" })
 	first, last := (f.Page-1)*txnPageSize+1, (f.Page-1)*txnPageSize+len(txns)
 	if total == 0 {
 		first = 0
@@ -388,7 +415,7 @@ func (a *app) index(w http.ResponseWriter, r *http.Request) {
 		"Txns": txns, "Cats": allCategories(), "Accounts": accts, "Groups": groups, "Sorts": sorts, "Hows": hows,
 		"F": f, "SelAcct": selAcct, "SelCat": selCat, "Chips": chips, "Active": active, "NActive": len(active),
 		"Total": total, "OutSum": out, "InSum": in, "Page": f.Page, "Pages": pages, "First": first, "Last": last,
-		"PrevURL": prevURL, "NextURL": nextURL, "ClearURL": "/transactions",
+		"PrevURL": prevURL, "NextURL": nextURL, "ClearURL": "/transactions", "HiddenIgnored": hidden, "ShowIgnoredURL": showIgnoredURL,
 		"PlaidReady": a.pc() != nil, "Flash": q.Get("msg"),
 	})
 }

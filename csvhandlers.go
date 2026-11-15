@@ -59,7 +59,10 @@ type optView struct {
 	Label    string
 	Selected bool
 }
-type acctOpt struct{ ID, Name string }
+type acctOpt struct {
+	ID, Name string
+	Card     bool // flagged as a credit card
+}
 type previewRow struct {
 	Date, Desc, Cat  string // Cat = the category column from the file, if any
 	Amount           float64
@@ -82,7 +85,7 @@ func colOpts(header []string, cur int, none bool) []optView {
 }
 
 func (a *app) manualAccounts() []acctOpt {
-	rows, err := a.db.Query(`SELECT plaid_account_id, name FROM accounts WHERE item_id IS NULL ORDER BY name`)
+	rows, err := a.db.Query(`SELECT plaid_account_id, name, is_card FROM accounts WHERE item_id IS NULL ORDER BY name`)
 	if err != nil {
 		return nil
 	}
@@ -90,7 +93,9 @@ func (a *app) manualAccounts() []acctOpt {
 	var out []acctOpt
 	for rows.Next() {
 		var o acctOpt
-		rows.Scan(&o.ID, &o.Name)
+		var card int
+		rows.Scan(&o.ID, &o.Name, &card)
+		o.Card = card == 1
 		out = append(out, o)
 	}
 	return out
@@ -131,7 +136,9 @@ func (a *app) importUpload(w http.ResponseWriter, r *http.Request) {
 		notes := append([]string{fmt.Sprintf("Read %d transactions from %d page(s) of a PDF statement.", len(res.Rows), res.Pages)}, res.Notes...)
 		s := &importSession{filename: hdr.Filename, header: res.Header, data: res.Rows, notes: notes, created: time.Now()}
 		// PDF layouts differ per bank, so no saved CSV profile or account is pre-selected.
-		a.renderMapping(w, putSession(s), s, guessMapping(res.Header, res.Rows), "", "", "", "")
+		pm := guessMapping(res.Header, res.Rows)
+		orientCardSign(&pm, res.Rows)
+		a.renderMapping(w, putSession(s), s, pm, "", "", "", "")
 		return
 	}
 	rows, err := readCSV(raw)
@@ -141,12 +148,16 @@ func (a *app) importUpload(w http.ResponseWriter, r *http.Request) {
 		if header, data, err = splitHeader(rows); err == nil {
 			s := &importSession{filename: hdr.Filename, header: header, data: data, created: time.Now()}
 			m, acct := guessMapping(header, data), ""
+			fromProfile := false
 			var js string
 			if a.db.QueryRow(`SELECT mapping, account_id FROM csv_profiles WHERE signature=?`, signature(header)).Scan(&js, &acct) == nil {
 				var saved mapping
 				if json.Unmarshal([]byte(js), &saved) == nil && saved.valid(len(header)) == nil {
-					m = saved // same format as a previous import
+					m, fromProfile = saved, true // same format as a previous import
 				}
+			}
+			if !fromProfile {
+				orientCardSign(&m, data) // a card statement's own payment line shows which way is spending
 			}
 			a.renderMapping(w, putSession(s), s, m, acct, "", "", "")
 			return
@@ -160,8 +171,22 @@ func (a *app) renderUploadError(w http.ResponseWriter, err error) {
 	a.tpl.ExecuteTemplate(w, "import.html", map[string]any{"Stage": "upload", "Error": err.Error()})
 }
 
-func (a *app) renderMapping(w http.ResponseWriter, tok string, s *importSession, m mapping, acct, newName, errMsg, _ string) {
+// renderMapping shows the mapping/preview screen. cardState is "on"/"off" once the user has made a
+// choice on the credit-card tickbox, or "" to start from the account's flag or the statement's look.
+func (a *app) renderMapping(w http.ResponseWriter, tok string, s *importSession, m mapping, acct, newName, errMsg, cardState string) {
 	conv, skipped := convertRows(s.data, m)
+	suggestCard := looksLikeCardStatement(conv)
+	cardChecked := suggestCard
+	var acctCard int
+	if acct != "" && acct != "new" && a.db.QueryRow(`SELECT is_card FROM accounts WHERE plaid_account_id=?`, acct).Scan(&acctCard) == nil {
+		cardChecked = acctCard == 1
+	}
+	switch cardState {
+	case "on":
+		cardChecked = true
+	case "off":
+		cardChecked = false
+	}
 	var prev []previewRow
 	levels := map[string]int{}
 	if m.valid(len(s.header)) == nil {
@@ -193,6 +218,7 @@ func (a *app) renderMapping(w http.ResponseWriter, tok string, s *importSession,
 		"Desc2Opts": colOpts(s.header, m.Desc2, true), "AmountOpts": colOpts(s.header, m.Amount, false),
 		"DebitOpts": colOpts(s.header, m.Debit, false), "CreditOpts": colOpts(s.header, m.Credit, false),
 		"CatOpts": colOpts(s.header, m.Category, true), "Layouts": layouts,
+		"SuggestCard": suggestCard, "CardChecked": cardChecked,
 		"Levels": levels, "Accounts": a.manualAccounts(), "Acct": acct, "NewName": newName, "Notes": s.notes,
 	})
 }
@@ -222,12 +248,17 @@ func (a *app) importRun(w http.ResponseWriter, r *http.Request) {
 		m.Layout = dateLayouts[i].Layout
 	}
 	acct, newName := r.FormValue("account"), strings.TrimSpace(r.FormValue("new_name"))
+	card := r.FormValue("is_card") == "on"
+	cardState := "off"
+	if card {
+		cardState = "on"
+	}
 
 	if r.FormValue("action") != "import" {
-		a.renderMapping(w, tok, s, m, acct, newName, "", "")
+		a.renderMapping(w, tok, s, m, acct, newName, "", cardState)
 		return
 	}
-	bad := func(msg string) { a.renderMapping(w, tok, s, m, acct, newName, msg, "") }
+	bad := func(msg string) { a.renderMapping(w, tok, s, m, acct, newName, msg, cardState) }
 	if err := m.valid(len(s.header)); err != nil {
 		bad(err.Error())
 		return
@@ -248,7 +279,7 @@ func (a *app) importRun(w http.ResponseWriter, r *http.Request) {
 		b := make([]byte, 8)
 		rand.Read(b)
 		acct = "csv-" + hex.EncodeToString(b)
-		if _, err := a.db.Exec(`INSERT INTO accounts(plaid_account_id,item_id,name,type) VALUES(?,NULL,?,'manual')`, acct, newName); err != nil {
+		if _, err := a.db.Exec(`INSERT INTO accounts(plaid_account_id,item_id,name,type,is_card) VALUES(?,NULL,?,'manual',?)`, acct, newName, boolInt(card)); err != nil {
 			fail(w, err, 500)
 			return
 		}
@@ -259,6 +290,7 @@ func (a *app) importRun(w http.ResponseWriter, r *http.Request) {
 			bad("unknown account")
 			return
 		}
+		a.db.Exec(`UPDATE accounts SET is_card=? WHERE plaid_account_id=?`, boolInt(card), acct) // the tickbox is the account's type
 	}
 
 	cl, err := newClassifier(a.db)
@@ -266,6 +298,7 @@ func (a *app) importRun(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, 500)
 		return
 	}
+	cctx := loadCardCtx(a.db)
 	ids := txnIDs(acct, txns)
 	tx, err := a.db.Begin()
 	if err != nil {
@@ -275,6 +308,7 @@ func (a *app) importRun(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback()
 	added := 0
 	levels := map[string]int{} // confidence of the transactions actually added
+	skippedCard := 0           // card repayments that are ignored
 	for i, t := range txns {
 		cr := cl.classifyFull(t.Desc, "", t.Cat, t.Amount)
 		res, err := tx.Exec(`INSERT INTO transactions(plaid_txn_id,account_id,date,name,merchant,amount,plaid_category,category,cat_source,confidence)
@@ -286,7 +320,11 @@ func (a *app) importRun(w http.ResponseWriter, r *http.Request) {
 		}
 		if n, _ := res.RowsAffected(); n > 0 {
 			added++
-			levels[confLevel(cr.Conf, false, cr.Cat)]++
+			if cctx.auto(card, cr.Cat, t.Amount, t.Desc) != ignoreNone {
+				skippedCard++ // an ignored repayment: not part of the review summary
+			} else {
+				levels[confLevel(cr.Conf, false, cr.Cat)]++
+			}
 		}
 	}
 	js, _ := json.Marshal(m)
@@ -300,7 +338,11 @@ func (a *app) importRun(w http.ResponseWriter, r *http.Request) {
 	sessions.Lock()
 	delete(sessions.m, tok)
 	sessions.Unlock()
+	recomputeIgnored(a.db) // sets the flag on the new rows (and on other accounts' payments to this card)
 	msg := fmt.Sprintf("Imported %d transactions (%d duplicates skipped).", added, len(txns)-added)
+	if skippedCard > 0 {
+		msg += fmt.Sprintf(" %d credit card repayment(s) ignored.", skippedCard)
+	}
 	dest := "/?msg="
 	if need := levels["low"] + levels["unknown"]; need > 0 {
 		// take the user straight to what needs a look, lowest confidence first

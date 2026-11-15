@@ -32,7 +32,7 @@ type dashData struct {
 // income and neutral categories (transfers, savings). Uncategorized counts as an expense.
 func (a *app) monthlySeries(from, to string) ([]monthPoint, error) {
 	rows, err := a.db.Query(`SELECT substr(date,1,7), category, SUM(amount) FROM transactions
-		WHERE date>=? AND date<=? GROUP BY 1,2 ORDER BY 1`, from, to)
+		WHERE ignored=0 AND date>=? AND date<=? GROUP BY 1,2 ORDER BY 1`, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func (a *app) dashboard(w http.ResponseWriter, r *http.Request) {
 			data.TopValues = append(data.TopValues, round2(topCats[i].Monthly))
 		}
 		rows, err := a.db.Query(`SELECT t.plaid_txn_id,t.date,t.name,a.name,t.category,t.amount,t.manual,t.cat_source
-			FROM transactions t JOIN accounts a ON a.plaid_account_id=t.account_id ORDER BY t.date DESC, t.plaid_txn_id LIMIT 8`)
+			FROM transactions t JOIN accounts a ON a.plaid_account_id=t.account_id WHERE t.ignored=0 ORDER BY t.date DESC, t.plaid_txn_id LIMIT 8`)
 		if err == nil {
 			for rows.Next() {
 				var t txnRow
@@ -130,7 +130,7 @@ func (a *app) dashboard(w http.ResponseWriter, r *http.Request) {
 		savings = rep.SurplusM / rep.IncomeM * 100
 	}
 	var uncat int
-	a.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE manual=0 AND (confidence<50 OR category='Uncategorized')`).Scan(&uncat)
+	a.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE ignored=0 AND manual=0 AND (confidence<50 OR category='Uncategorized')`).Scan(&uncat)
 	a.tpl.ExecuteTemplate(w, "dashboard.html", map[string]any{
 		"Rep": rep, "Data": data, "Top": topCats, "Recent": recent, "Months": months,
 		"SavingsRate": savings, "Uncat": uncat, "Flash": r.URL.Query().Get("msg"),

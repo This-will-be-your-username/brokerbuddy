@@ -54,6 +54,23 @@ section.card{scroll-margin-top:12px}
       <form class="inline" method="post" action="/accounts/delete" onsubmit="return confirm('Delete this account and all its transactions?')"><input type="hidden" name="id" value="{{.ID}}"><button class="danger">Delete</button></form></div>{{end}}
     {{if not (or .Items .Manual)}}<div class="mut">No accounts yet. <a href="/import">Import a CSV</a> to add one.</div>{{end}}
   </div>
+
+  <h2 style="margin-top:22px">Credit cards</h2>
+  <p class="mut small">Tick the accounts that are credit cards. Payments <em>into</em> a card (such as “PAYMENT RECEIVED – THANK YOU”) are the same money as the payment from your other account, so they are ignored rather than counted twice as income. Ignored transactions stay visible on the Transactions page but are left out of the dashboard, charts, lender view and mortgage analysis.</p>
+  <div class="list">
+    {{range .AllAccounts}}<div>
+      <form class="inline" method="post" action="/accounts/flag" style="display:flex;gap:10px;align-items:center">
+        <input type="hidden" name="id" value="{{.ID}}">
+        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="card" {{if .Card}}checked{{end}} onchange="this.form.submit()" aria-label="{{.Name}} is a credit card"> <span><strong>{{.Name}}</strong> <span class="pill">{{.Source}}</span></span></label>
+      </form>
+      <span class="mut small">{{if .Card}}credit card{{if .Ignored}} · {{.Ignored}} repayment(s) ignored{{end}}{{else if .Ignored}}{{.Ignored}} card payment(s) ignored{{end}}</span>
+    </div>{{else}}<div class="mut">No accounts yet.</div>{{end}}
+  </div>
+  <form method="post" action="/settings/cards" class="row" style="margin-top:12px">
+    <label><input type="checkbox" name="elsewhere" {{if .CardElsewhere}}checked{{end}} onchange="this.form.submit()"> Also ignore payments to a credit card made from my other accounts (the card's own purchases are counted instead)</label>
+    <noscript><button>Save</button></noscript>
+  </form>
+  {{if .IgnoredTotal}}<p class="small" style="margin:8px 0 0">{{.IgnoredTotal}} transaction(s) are ignored. <a href="/transactions?ignored=only">Show them</a></p>{{end}}
 </section>
 
 <section class="card" id="categorisation">

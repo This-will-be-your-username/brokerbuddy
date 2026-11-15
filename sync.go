@@ -50,9 +50,9 @@ func (a *app) syncItemByPlaidID(plaidItemID string) error {
 
 	for _, res := range all {
 		for _, ac := range res.Accounts {
-			if _, err := tx.Exec(`INSERT INTO accounts(plaid_account_id,item_id,name,mask,type) VALUES(?,?,?,?,?)
+			if _, err := tx.Exec(`INSERT INTO accounts(plaid_account_id,item_id,name,mask,type,is_card) VALUES(?,?,?,?,?,?)
 				ON CONFLICT(plaid_account_id) DO UPDATE SET name=excluded.name, mask=excluded.mask`,
-				ac.ID, id, ac.Name, ac.Mask, ac.Type); err != nil {
+				ac.ID, id, ac.Name, ac.Mask, ac.Type, boolInt(ac.Type == "credit")); err != nil { // Plaid says which accounts are credit cards; your own flag wins afterwards
 				return err
 			}
 		}
@@ -79,5 +79,16 @@ func (a *app) syncItemByPlaidID(plaidItemID string) error {
 	if _, err := tx.Exec(`UPDATE items SET cursor=? WHERE id=?`, cursor, id); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	_, err = recomputeIgnored(a.db)
+	return err
+}
+
+func boolInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

@@ -12,7 +12,7 @@ type apiCategory struct{ Name, Group string }
 // aggregates in the browser so every control responds instantly.
 func (a *app) apiTransactions(w http.ResponseWriter, r *http.Request) {
 	rows, err := a.db.Query(`SELECT t.date, t.amount, t.category, t.account_id, t.name
-		FROM transactions t ORDER BY t.date LIMIT 200000`)
+		FROM transactions t WHERE t.ignored=0 ORDER BY t.date LIMIT 200000`)
 	if err != nil {
 		fail(w, err, 500)
 		return

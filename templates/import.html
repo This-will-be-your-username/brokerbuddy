@@ -67,12 +67,21 @@
 
 <div class="card">
   <h2>Import into</h2>
-  <select name="account" aria-label="Account">
-    {{range .Accounts}}<option value="{{.ID}}" {{if eq .ID $.Acct}}selected{{end}}>{{.Name}}</option>{{end}}
+  <select name="account" id="acctsel" aria-label="Account">
+    {{range .Accounts}}<option value="{{.ID}}" data-card="{{if .Card}}1{{end}}" {{if eq .ID $.Acct}}selected{{end}}>{{.Name}}{{if .Card}} (credit card){{end}}</option>{{end}}
     <option value="new" {{if not .Acct}}selected{{end}}>＋ New account…</option>
   </select>
   <input name="new_name" value="{{.NewName}}" placeholder="New account name, e.g. Everyday Account">
+  <p style="margin:10px 0 0"><label><input type="checkbox" name="is_card" id="iscard" {{if .CardChecked}}checked{{end}}> This is a <strong>credit card</strong> account</label></p>
+  <p class="mut small" style="margin:4px 0 0">{{if .SuggestCard}}<strong>This looks like a credit card statement</strong> (it lists payments received). {{end}}Repayments made to a credit card are ignored, because they are the same money as the payment from your other account and would otherwise be counted twice.</p>
   <p class="mut">Re-importing overlapping exports is safe: transactions already imported are skipped.</p>
+  <script>
+  // choosing an existing account shows whether it is flagged as a credit card
+  (function () {
+    var sel = document.getElementById('acctsel'), box = document.getElementById('iscard');
+    sel.addEventListener('change', function () { var o = sel.options[sel.selectedIndex]; if (o.value !== 'new') box.checked = o.dataset.card === '1'; });
+  })();
+  </script>
   <button class="primary" name="action" value="import">Import</button>
   <a href="/import">Cancel</a>
 </div>
