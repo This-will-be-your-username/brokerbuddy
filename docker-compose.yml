@@ -3,7 +3,7 @@
 services:
   brokerbuddy:
     image: ${BROKERBUDDY_IMAGE:-ghcr.io/this-will-be-your-username/brokerbuddy:latest}
-    # build: .   # use instead of "image" to build from this checkout
+    pull_policy: ${BROKERBUDDY_PULL:-always}   # always fetch the newest image from GitHub; "missing" reuses a local copy
     container_name: brokerbuddy
     restart: unless-stopped
     ports:

@@ -176,9 +176,10 @@ Every setting has a default and can be overridden in the shell or in a `.env` fi
 | `BROKERBUDDY_PORT` | `8443` | Port on the host |
 | `BROKERBUDDY_BIND` | `127.0.0.1` | Host address to publish on; `0.0.0.0` exposes it to your network, so set a password first |
 | `BROKERBUDDY_DATA` | `brokerbuddy-data` | Volume name, or a folder path for a bind mount |
+| `BROKERBUDDY_PULL` | `always` | `always` fetches the newest image from GitHub on each `up`; `missing` reuses a local copy |
 | `TZ` | `UTC` | Time zone |
 
-To build the image from source instead of pulling it, replace the `image:` line in `docker-compose.yml` with `build: .` and run `docker compose up -d --build`.
+Compose pulls the published image and never builds locally. To build from source instead, use `docker build -t brokerbuddy .` and set `BROKERBUDDY_IMAGE=brokerbuddy` and `BROKERBUDDY_PULL=never`.
 
 ### Day-to-day commands
 
