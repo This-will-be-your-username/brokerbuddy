@@ -28,7 +28,7 @@ section.card{scroll-margin-top:12px}
 </header>
 {{if .Flash}}<div class="card flash" role="status">{{.Flash}}</div>{{end}}
 {{if .Error}}<div class="card neg" role="alert">{{.Error}}</div>{{end}}
-<div class="sections"><a href="#banks">Banks</a><a href="#categorisation">Categorisation</a><a href="#telegram">Telegram</a><a href="#security">Security</a><a href="#access">Access &amp; HTTPS</a><a href="#about">About</a></div>
+<div class="sections"><a href="#banks">Banks</a><a href="#categorisation">Categorisation</a><a href="#telegram">Telegram</a><a href="#security">Security</a><a href="#access">Access &amp; HTTPS</a><a href="#backup">Backup</a><a href="#about">About</a></div>
 
 <section class="card" id="banks">
   <h2>Bank connection (Plaid)</h2>
@@ -222,6 +222,20 @@ section.card{scroll-margin-top:12px}
     {{range .Status}}<div><span class="{{if .OK}}ok{{else}}bad{{end}}">{{.Kind}} <code>{{.Addr}}</code></span><span class="mut small">{{if .OK}}listening{{else}}{{.Detail}}{{end}}</span></div>{{end}}
   </div>
   <p class="mut small">Let's Encrypt gets the certificate on the first visit to your domain, which can take a few seconds.</p>
+</section>
+
+<section class="card" id="backup">
+  <h2>Backup &amp; migration</h2>
+  <p class="mut small">Export everything (transactions, accounts, rules, settings and saved secrets) as one file, to back up or to move BrokerBuddy to another computer. The file includes the encryption key that protects your bank tokens, so <strong>keep it private</strong>, like a password.</p>
+  <form method="get" action="/settings/export" class="row"><button class="primary">Export database</button></form>
+
+  <h2 style="margin-top:22px">Import a backup</h2>
+  <p class="mut small"><strong>This replaces all existing data</strong>: accounts, transactions, rules and settings (including the password and the encryption key) are overwritten by the backup, and cannot be recovered. Export first if you might need what is here now. You will be signed out; sign in with the backup's password if it has one.</p>
+  <form method="post" action="/settings/import" enctype="multipart/form-data" class="stack" onsubmit="return confirm('Replace ALL existing data with this backup? This cannot be undone.')">
+    <label class="f">Backup file<input type="file" name="file" accept=".db,.sqlite,.sqlite3,application/vnd.sqlite3" required></label>
+    <label class="small"><input type="checkbox" name="confirm" required> I understand this deletes everything currently stored and replaces it with the backup</label>
+    <div><button class="danger">Import &amp; overwrite</button></div>
+  </form>
 </section>
 
 <section class="card" id="about">

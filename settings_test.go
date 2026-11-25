@@ -435,3 +435,105 @@ func TestSameOriginCheck(t *testing.T) {
 		t.Errorf("Referrer-Policy %q", got)
 	}
 }
+
+func multipartImport(t *testing.T, c *testClient, data []byte, confirm bool) *http.Response {
+	t.Helper()
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	if confirm {
+		mw.WriteField("confirm", "on")
+	}
+	fw, _ := mw.CreateFormFile("file", "backup.db")
+	fw.Write(data)
+	mw.Close()
+	req, _ := http.NewRequest("POST", c.srv.URL+"/settings/import", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Origin", c.srv.URL)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp
+}
+
+func TestExportImportOverwritesEverything(t *testing.T) {
+	src := testApp(t)
+	src.db.Exec(`INSERT INTO accounts(plaid_account_id,name) VALUES('a1','Everyday')`)
+	src.db.Exec(`INSERT INTO transactions(plaid_txn_id,account_id,date,name,amount) VALUES('t1','a1','2026-01-02','COFFEE',4.5)`)
+	src.db.Exec(`INSERT INTO rules(pattern,category) VALUES('coffee','Dining & Takeaway')`)
+	src.setSecret("plaid_secret", "from-backup")
+	snap := filepath.Join(t.TempDir(), "snap.db")
+	if err := src.exportBackup(snap); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(snap)
+
+	dst := testApp(t) // different encryption key and different data
+	dst.db.Exec(`INSERT INTO accounts(plaid_account_id,name) VALUES('zz','Old')`)
+	dst.db.Exec(`INSERT INTO transactions(plaid_txn_id,account_id,date,name,amount) VALUES('old','zz','2025-01-01','OLD',1)`)
+	dst.setSecret("plaid_secret", "to-be-lost")
+	c := newClient(t, dst)
+
+	if resp := multipartImport(t, c, data, false); !strings.Contains(resp.Header.Get("Location"), "err=") {
+		t.Error("import without confirmation must be refused")
+	}
+	if resp := multipartImport(t, c, []byte("not a database"), true); !strings.Contains(resp.Header.Get("Location"), "err=") {
+		t.Error("garbage must be refused")
+	}
+	var n int
+	dst.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE plaid_txn_id='old'`).Scan(&n)
+	if n != 1 {
+		t.Fatal("a refused import must not touch existing data")
+	}
+
+	resp := multipartImport(t, c, data, true)
+	if loc := resp.Header.Get("Location"); strings.Contains(loc, "err=") {
+		t.Fatal(loc)
+	}
+	var ids string
+	dst.db.QueryRow(`SELECT group_concat(plaid_txn_id) FROM transactions`).Scan(&ids)
+	if ids != "t1" {
+		t.Errorf("transactions after import: %q", ids)
+	}
+	dst.db.QueryRow(`SELECT COUNT(*) FROM accounts WHERE plaid_account_id='zz'`).Scan(&n)
+	if n != 0 {
+		t.Error("old accounts must be gone")
+	}
+	if got := dst.getSecret("plaid_secret"); got != "from-backup" {
+		t.Errorf("secrets must be readable after import, got %q", got)
+	}
+	if k, _ := loadOrCreateKey(dst.keyPath); k == "" || k != mustKey(t, src) {
+		t.Error("key file must carry over")
+	}
+	// the app still works and keeps working after a restart with the restored key
+	dst.db.Close()
+	again, err := newApp(dst.dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer again.db.Close()
+	if again.getSecret("plaid_secret") != "from-backup" {
+		t.Error("secret unreadable after restart")
+	}
+}
+
+func mustKey(t *testing.T, a *app) string {
+	k, err := loadOrCreateKey(a.keyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
+func TestExportDownloadIsAttachment(t *testing.T) {
+	a := testApp(t)
+	c := newClient(t, a)
+	resp := c.get("/settings/export")
+	if resp.StatusCode != 200 || !strings.Contains(resp.Header.Get("Content-Disposition"), "attachment") {
+		t.Fatalf("%d %v", resp.StatusCode, resp.Header)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	if !bytes.HasPrefix(b, []byte("SQLite format 3\x00")) {
+		t.Error("export must be a SQLite file")
+	}
+}

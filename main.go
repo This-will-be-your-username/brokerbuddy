@@ -158,6 +158,8 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("POST /settings/password", a.savePassword)
 	mux.HandleFunc("POST /settings/password/remove", a.removePassword)
 	mux.HandleFunc("POST /settings/network", a.saveNetwork)
+	mux.HandleFunc("GET /settings/export", a.exportDownload)
+	mux.HandleFunc("POST /settings/import", a.importUploadBackup)
 	mux.HandleFunc("GET /login", a.loginPage)
 	mux.HandleFunc("POST /login", a.loginSubmit)
 	mux.HandleFunc("POST /logout", a.logout)

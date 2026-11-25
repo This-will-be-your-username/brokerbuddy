@@ -49,7 +49,7 @@ go run . -db demo.db -demo
 | `-demo` | off | fill an empty database with a year of fictional transactions |
 | `-version` | | print the version and exit |
 
-On first run an encryption key is created next to the database (`brokerbuddy.db.key`). **Back up both files together.**
+On first run an encryption key is created next to the database (`brokerbuddy.db.key`). **Back up both files together**, or use **Settings → Backup & migration** to export everything (key included) as a single file and import it on another machine. Importing replaces all existing data.
 
 ## Screenshots
 
