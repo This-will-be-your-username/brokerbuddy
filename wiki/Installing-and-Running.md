@@ -168,6 +168,16 @@ docker compose pull && docker compose up -d     # update
 docker compose down                             # stop (your data volume is kept)
 ```
 
+Every setting has a default and can be overridden in the shell or in a `.env` file next to `docker-compose.yml`:
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `BROKERBUDDY_IMAGE` | `ghcr.io/<owner>/brokerbuddy:latest` | Image to run |
+| `BROKERBUDDY_PORT` | `8443` | Port on the host |
+| `BROKERBUDDY_BIND` | `127.0.0.1` | Host address to publish on; `0.0.0.0` exposes it to your network, so set a password first |
+| `BROKERBUDDY_DATA` | `brokerbuddy-data` | Volume name, or a folder path for a bind mount |
+| `TZ` | `UTC` | Time zone |
+
 To build the image from source instead of pulling it, replace the `image:` line in `docker-compose.yml` with `build: .` and run `docker compose up -d --build`.
 
 ### Day-to-day commands
