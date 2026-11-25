@@ -28,7 +28,7 @@ section.card{scroll-margin-top:12px}
 </header>
 {{if .Flash}}<div class="card flash" role="status">{{.Flash}}</div>{{end}}
 {{if .Error}}<div class="card neg" role="alert">{{.Error}}</div>{{end}}
-<div class="sections"><a href="#banks">Banks</a><a href="#categorisation">Categorisation</a><a href="#security">Security</a><a href="#access">Access &amp; HTTPS</a><a href="#about">About</a></div>
+<div class="sections"><a href="#banks">Banks</a><a href="#categorisation">Categorisation</a><a href="#telegram">Telegram</a><a href="#security">Security</a><a href="#access">Access &amp; HTTPS</a><a href="#about">About</a></div>
 
 <section class="card" id="banks">
   <h2>Bank connection (Plaid)</h2>
@@ -148,6 +148,30 @@ section.card{scroll-margin-top:12px}
   <p class="mut small">A year of fictional transactions for trying the app, testing, or taking screenshots, with no real bank data involved. It is kept in its own accounts and never mixed into your own: loading is only possible while you have no transactions of your own. To keep your real data safe, run a separate copy with <code>brokerbuddy -db demo.db -demo</code>.</p>
   {{if .DemoLoaded}}<form method="post" action="/demo/remove" class="row"><button class="danger">Remove demo data</button><span class="mut small">Demo data is loaded. Removing it deletes only the demo accounts and their transactions.</span></form>
   {{else}}<form method="post" action="/demo/load"><button>Load demo data</button></form>{{end}}
+</section>
+
+<section class="card" id="telegram">
+  <h2>Telegram bot</h2>
+  <p class="mut small">Categorise from your phone. Once a day the bot picks an uncategorised merchant (a high-value or frequent one), searches for what it is, and messages you suggested categories. Reply with a number, a category name or “skip”, and it is categorised, along with other uncategorised transactions from the same merchant. It also answers <code>/next</code>, <code>/status</code> and <code>/help</code>. It works from behind your router: nothing needs to be opened.</p>
+  <ol class="mut small">
+    <li>In Telegram, message <strong>@BotFather</strong>, send <code>/newbot</code> and paste the token it gives you below.</li>
+    <li>Open a chat with your new bot and press <strong>Start</strong>. It replies with your chat ID: enter that as the recipient.</li>
+  </ol>
+  <p class="mut small">The bot only talks to the recipient; messages from anyone else are ignored. Telegram sees the messages, which include the transaction description and amount. The online lookup sends only the cleaned merchant name. The token is stored encrypted.</p>
+  <form method="post" action="/settings/telegram" class="stack">
+    <div class="fields">
+      <label class="f">Bot token<input name="token" type="password" autocomplete="new-password" spellcheck="false" placeholder="{{if .TgTokenSet}}•••••••• saved (leave blank to keep){{else}}123456789:ABC…{{end}}"></label>
+      <label class="f">Recipient chat ID<input name="chat_id" value="{{.TgChatID}}" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="e.g. 123456789"></label>
+      <label class="f">Send daily at<select name="hour">{{range .TgHours}}<option value="{{.}}" {{if eq . $.TgHour}}selected{{end}}>{{printf "%02d" .}}:00</option>{{end}}</select></label>
+    </div>
+    <div class="row">
+      <label class="small"><input type="checkbox" name="enabled" {{if .TgEnabled}}checked{{end}}> Bot on</label>
+      <button class="primary">Save &amp; send test</button>
+      {{if .TgTokenSet}}<label class="small mut"><input type="checkbox" name="remove"> Remove the bot settings</label>{{end}}
+      {{if .TgStatus.Running}}{{if .TgStatus.Error}}<span class="bad small">{{.TgStatus.Error}}</span>{{else}}<span class="ok small">Running</span>{{end}}{{end}}
+    </div>
+  </form>
+  {{if .TgEnabled}}<form method="post" action="/settings/telegram/ask" class="row" style="margin-top:12px"><button>Ask me about one now</button></form>{{end}}
 </section>
 
 <section class="card" id="security">

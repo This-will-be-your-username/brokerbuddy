@@ -11,6 +11,7 @@ All configuration is done in the web interface under **Settings**. There are no 
 | Banks | Optional Plaid keys, connected and imported accounts, credit card flags |
 | Categorisation | Your rules, repayments from other people, merchant lookups, reprocessing |
 | Demo data | Load or remove the [demo data](Demo-Data) |
+| Telegram | Optional bot that asks about one uncategorised transaction a day, see [Telegram bot](#telegram-bot) |
 | Password | Set or remove the password |
 | Access & HTTPS | Who can reach the app and over what certificate |
 | Your data | Where the database and key file are, how to back up |
@@ -53,3 +54,23 @@ Copy `brokerbuddy.db` and `brokerbuddy.db.key` while the app is stopped, or use 
 ## Removing everything
 
 Stop the app and delete the database and key files. Nothing is stored anywhere else.
+
+## Telegram bot
+
+An optional bot lets you categorise from your phone, from anywhere, without exposing BrokerBuddy to the internet. It polls Telegram, so no ports or webhooks are needed, but BrokerBuddy must be running.
+
+**Set up**
+
+1. In Telegram, message **@BotFather**, send `/newbot` and copy the token it gives you.
+2. Open a chat with your new bot and press **Start**. It replies with your chat ID.
+3. In **Settings → Telegram**, paste the token, enter the chat ID as the recipient, pick the hour, tick **Bot on** and save. A test message confirms it works.
+
+**What it does**
+
+Each day, at the chosen hour (the computer's local time), the bot picks one uncategorised merchant: whichever stands out most by total value or by how often it appears. It skips merchants it asked about in the last 30 days. It searches for suggestions (your own history and rules, plus a Wikipedia search of the cleaned merchant name) and messages the recipient a numbered list with buttons.
+
+Reply with a number, a category name (a part is enough, such as `dining`) or `skip`. The transaction is confirmed with that category, and the other uncategorised transactions from the same merchant follow. 
+
+Reply `more` (or tap **More categories**) to see every category and pick one. Commands: `/next` asks about another one now, `/status` shows how many transactions still need a category, `/skip` and `/help`. **Ask me about one now** in Settings does the same as `/next`.
+
+**Security**: the bot only answers the configured chat. Anyone else who messages it is ignored (apart from `/start`, which tells them their own chat ID). The token is stored encrypted. Telegram sees the question and your replies, including the description and amount, so use a private chat that only you can read. See [Privacy](Privacy).

@@ -14,6 +14,7 @@ Your data stays on your computer, in one SQLite file. There are no paid services
 - **Credit cards and repayments:** card repayments are not double counted, and small credits from friends offset the spending they relate to.
 - **Dashboard, charts and a lender view** for income, spending and surplus.
 - **Mortgage planner:** borrowing capacity, stamp duty for every state, live market rates, and spending sliders that recalculate the price you could afford.
+- **Categorise from your phone:** an optional Telegram bot asks about one uncategorised transaction a day, suggests categories, and applies your reply.
 - **Private and secure:** secrets encrypted at rest, password login, HTTPS (self-signed, Let's Encrypt or your own certificate), nothing personal ever sent to lookups.
 - **Light, dark and auto themes.** All configuration is in the web interface.
 

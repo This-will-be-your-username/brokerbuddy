@@ -78,6 +78,11 @@ CREATE TABLE IF NOT EXISTS settings (
 	key TEXT PRIMARY KEY,
 	value TEXT NOT NULL                  -- secrets are stored AES-GCM encrypted
 );
+CREATE TABLE IF NOT EXISTS telegram_asked (
+	key TEXT PRIMARY KEY,                -- cleaned merchant name the bot asked about
+	asked_at TEXT NOT NULL,
+	outcome TEXT NOT NULL DEFAULT ''     -- '' = waiting for a reply | skipped | <category chosen>
+);
 CREATE TABLE IF NOT EXISTS rules (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	pattern TEXT NOT NULL,               -- case-insensitive substring of name/merchant

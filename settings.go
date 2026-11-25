@@ -317,6 +317,8 @@ func (a *app) settingsPage(w http.ResponseWriter, r *http.Request) {
 		"HasPassword": a.hasPassword(), "DemoLoaded": demoExists(a.db),
 		"NetMode": mode, "NetDomain": a.getSetting("net_domain"), "NetEmail": a.getSetting("net_email"), "NetAddr": addr,
 		"NetStaging": a.getSetting("net_staging") == "1", "CertSet": a.getSetting("net_cert") != "",
+		"TgTokenSet": a.getSetting("telegram_token") != "", "TgChatID": a.getSetting("telegram_chat_id"), "TgHour": a.tg.hour(),
+		"TgEnabled": a.tg.enabled(), "TgStatus": a.tg.status(), "TgHours": hoursOfDay(),
 		"Status": a.net.Status(), "LocalAddr": a.net.localAddr, "DBPath": a.dbPath, "KeyPath": a.keyPath,
 	})
 }

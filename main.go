@@ -34,6 +34,7 @@ type app struct {
 	net     *netManager
 	sess    *sessionStore
 	limiter *loginLimiter
+	tg      *telegramBot
 }
 
 // pc returns the Plaid client, or nil when Plaid isn't configured.
@@ -64,6 +65,7 @@ func main() {
 	}
 	a.net = newNetManager(a, a.routes(), *addr)
 	a.net.Start()
+	a.tg.Reload() // starts the Telegram bot if it is configured and enabled
 	log.Printf("BrokerBuddy is running: open https://%s in your browser (configure everything under Settings)", *addr)
 	select {}
 }
@@ -83,6 +85,7 @@ func newApp(dbPath string) (*app, error) {
 		return nil, err
 	}
 	a := &app{db: db, vault: v, tpl: parseTemplates(), dbPath: dbPath, keyPath: keyPath, sess: newSessionStore(), limiter: newLoginLimiter()}
+	a.tg = newTelegramBot(a)
 	a.reloadPlaid()
 	if n, err := cleanStoredNames(db); err != nil {
 		log.Println("clean names:", err)
@@ -150,6 +153,8 @@ func (a *app) routes() http.Handler {
 	// settings & sign-in
 	mux.HandleFunc("GET /settings", a.settingsPage)
 	mux.HandleFunc("POST /settings/plaid", a.savePlaid)
+	mux.HandleFunc("POST /settings/telegram", a.saveTelegram)
+	mux.HandleFunc("POST /settings/telegram/ask", a.telegramAskNow)
 	mux.HandleFunc("POST /settings/password", a.savePassword)
 	mux.HandleFunc("POST /settings/password/remove", a.removePassword)
 	mux.HandleFunc("POST /settings/network", a.saveNetwork)
@@ -342,35 +347,11 @@ func (a *app) setCategory(w http.ResponseWriter, r *http.Request) {
 		fail(w, errBad, 400)
 		return
 	}
-	if _, err := a.db.Exec(`UPDATE transactions SET category=?, manual=1, confidence=100, cat_source='manual',
-		edited_seq=(SELECT COALESCE(MAX(edited_seq),0)+1 FROM transactions) WHERE plaid_txn_id=?`, cat, id); err != nil {
+	applied, fixed, err := a.categorizeTxn(id, cat, r.FormValue("make_rule") == "on")
+	if err != nil {
 		fail(w, err, 500)
 		return
 	}
-	// Count what the history lookup below changes (the row just edited no longer counts), so the user is told.
-	count := func(sql string, args ...any) (n int) { a.db.QueryRow(sql, args...).Scan(&n); return }
-	beforeCat := count(`SELECT COUNT(*) FROM transactions WHERE manual=0 AND category=?`, cat)
-	beforeUnknown := count(`SELECT COUNT(*) FROM transactions WHERE manual=0 AND (confidence<50 OR category='Uncategorized')`)
-	if r.FormValue("make_rule") == "on" {
-		var name, merchant string
-		a.db.QueryRow(`SELECT name, merchant FROM transactions WHERE plaid_txn_id=?`, id).Scan(&name, &merchant)
-		pat := merchant
-		if pat == "" {
-			pat = name
-		}
-		if pat != "" {
-			a.db.Exec(`INSERT INTO rules(pattern,category) VALUES(?,?)`, pat, cat)
-		}
-	}
-	// Look through the transaction history: other transactions from the same merchant, whether
-	// uncategorised or low confidence, take this category (and anything close to it follows).
-	// The edit just made is now a confirmed example the classifier learns from.
-	a.applyToSameMerchant(id, cat)
-	if _, err := recategorize(a.db); err != nil {
-		log.Println("recategorize:", err)
-	}
-	applied := count(`SELECT COUNT(*) FROM transactions WHERE manual=0 AND category=?`, cat) - beforeCat
-	fixed := beforeUnknown - count(`SELECT COUNT(*) FROM transactions WHERE manual=0 AND (confidence<50 OR category='Uncategorized')`)
 	dest := "/transactions"
 	if ref, err := url.Parse(r.Header.Get("Referer")); err == nil && ref.Path != "" {
 		q := ref.Query()
@@ -385,6 +366,42 @@ func (a *app) setCategory(w http.ResponseWriter, r *http.Request) {
 		dest = ref.Path + "?" + q.Encode()
 	}
 	http.Redirect(w, r, dest, http.StatusSeeOther)
+}
+
+// categorizeTxn confirms a category for one transaction (as if the user edited it), then looks
+// through the history so the same or a similar merchant follows. It returns how many other
+// transactions took the category, and how many of those were previously unsure. Shared by the
+// web interface and the Telegram bot.
+func (a *app) categorizeTxn(id, cat string, makeRule bool) (applied, fixed int, err error) {
+	if _, err = a.db.Exec(`UPDATE transactions SET category=?, manual=1, confidence=100, cat_source='manual',
+		edited_seq=(SELECT COALESCE(MAX(edited_seq),0)+1 FROM transactions) WHERE plaid_txn_id=?`, cat, id); err != nil {
+		return
+	}
+	// Count what the history lookup below changes (the row just edited no longer counts), so the user is told.
+	count := func(sql string, args ...any) (n int) { a.db.QueryRow(sql, args...).Scan(&n); return }
+	beforeCat := count(`SELECT COUNT(*) FROM transactions WHERE manual=0 AND category=?`, cat)
+	beforeUnknown := count(`SELECT COUNT(*) FROM transactions WHERE manual=0 AND (confidence<50 OR category='Uncategorized')`)
+	if makeRule {
+		var name, merchant string
+		a.db.QueryRow(`SELECT name, merchant FROM transactions WHERE plaid_txn_id=?`, id).Scan(&name, &merchant)
+		pat := merchant
+		if pat == "" {
+			pat = name
+		}
+		if pat != "" {
+			a.db.Exec(`INSERT INTO rules(pattern,category) VALUES(?,?)`, pat, cat)
+		}
+	}
+	// Look through the transaction history: other transactions from the same merchant, whether
+	// uncategorised or low confidence, take this category (and anything close to it follows).
+	// The edit just made is now a confirmed example the classifier learns from.
+	a.applyToSameMerchant(id, cat)
+	if _, rerr := recategorize(a.db); rerr != nil {
+		log.Println("recategorize:", rerr)
+	}
+	applied = count(`SELECT COUNT(*) FROM transactions WHERE manual=0 AND category=?`, cat) - beforeCat
+	fixed = beforeUnknown - count(`SELECT COUNT(*) FROM transactions WHERE manual=0 AND (confidence<50 OR category='Uncategorized')`)
+	return
 }
 
 func (a *app) addRule(w http.ResponseWriter, r *http.Request) {
