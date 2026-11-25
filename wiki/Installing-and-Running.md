@@ -165,7 +165,22 @@ The repository has a `docker-compose.yml`:
 docker compose up -d
 docker compose logs -f
 docker compose pull && docker compose up -d     # update
+docker compose down                             # stop (your data volume is kept)
 ```
+
+To build the image from source instead of pulling it, replace the `image:` line in `docker-compose.yml` with `build: .` and run `docker compose up -d --build`.
+
+### Day-to-day commands
+
+```
+docker logs -f brokerbuddy                 # watch the log
+docker stop brokerbuddy                    # stop
+docker start brokerbuddy                   # start again
+docker pull ghcr.io/<owner>/brokerbuddy:latest
+docker rm -f brokerbuddy                   # remove the old container (the volume stays)
+```
+
+After pulling, repeat the `docker run` command above to start the new version. Updating never touches the `brokerbuddy-data` volume, so your data carries over. Take a backup first (below) before a major version change.
 
 ### Demo mode in a container
 
@@ -182,7 +197,20 @@ docker run --rm -v brokerbuddy-data:/data -v "$PWD":/backup alpine \
   tar czf /backup/brokerbuddy-backup.tgz -C /data .
 ```
 
-The archive holds the database and the key file together, which is what you must keep. Store it somewhere safe.
+The archive holds the database and the key file together, which is what you must keep. Store it somewhere safe. On Windows PowerShell use `${PWD}` in place of `"$PWD"`.
+
+To restore it into a volume, stop the container first, then:
+
+```
+docker run --rm -v brokerbuddy-data:/data -v "$PWD":/backup alpine \
+  tar xzf /backup/brokerbuddy-backup.tgz -C /data
+docker run --rm --user root --entrypoint sh -v brokerbuddy-data:/data ghcr.io/<owner>/brokerbuddy:latest \
+  -c "chown -R brokerbuddy:brokerbuddy /data"
+```
+
+The second command makes sure the container's own user owns the restored files.
+
+Alternatively, use the in-app database export and import under Settings, which needs no Docker commands.
 
 ### Building the image yourself
 
