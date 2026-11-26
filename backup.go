@@ -24,7 +24,10 @@ import (
 // secrets inside it are only readable with that key. It also means the file must be kept private.
 //
 // Importing replaces everything: every table is emptied and refilled from the backup in one
-// transaction, so a failed import leaves the current data untouched.
+// transaction, so a failed import leaves the current data untouched. The one choice is the
+// Telegram bot: the importer either migrates the backup's bot or keeps this install's own Telegram
+// settings. A bot token can only be polled by one install at a time, so keeping the local settings
+// lets a copy run beside the original without the two competing for the bot's messages.
 
 const backupMetaTable = "backup_meta"
 
@@ -131,8 +134,90 @@ func tableColumns(ctx context.Context, c *sql.Conn, schemaName, table string) ([
 	return cols, rows.Err()
 }
 
+// importOptions are the choices offered on the import form.
+type importOptions struct {
+	// MigrateTelegram takes the Telegram bot (token, recipient, schedule and question history) from
+	// the backup. When false, this install's own Telegram settings and history are kept as they are.
+	MigrateTelegram bool
+}
+
+// tgSettingsWhere selects the settings rows that belong to the Telegram bot.
+const tgSettingsWhere = `key LIKE 'telegram\_%' ESCAPE '\'`
+
+type tgSnapshot struct {
+	settings map[string]string // plaintext: the token is decrypted so it can be re-sealed with the new key
+	asked    [][3]string       // telegram_asked rows: key, asked_at, outcome
+}
+
+// snapshotTelegram reads this install's Telegram settings and history so they survive an import.
+func (a *app) snapshotTelegram() (*tgSnapshot, error) {
+	snap := &tgSnapshot{settings: map[string]string{}}
+	rows, err := a.db.Query(`SELECT key, value FROM settings WHERE ` + tgSettingsWhere)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var k, v string
+		if err := rows.Scan(&k, &v); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		snap.settings[k] = v
+	}
+	rows.Close()
+	if enc, ok := snap.settings["telegram_token"]; ok {
+		if tok, err := a.vault.open(enc); err == nil {
+			snap.settings["telegram_token"] = tok
+		} else {
+			delete(snap.settings, "telegram_token") // already unreadable here: nothing to keep
+		}
+	}
+	rows, err = a.db.Query(`SELECT key, asked_at, outcome FROM telegram_asked`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var r [3]string
+		if err := rows.Scan(&r[0], &r[1], &r[2]); err != nil {
+			return nil, err
+		}
+		snap.asked = append(snap.asked, r)
+	}
+	return snap, rows.Err()
+}
+
+// restoreTelegram replaces the imported Telegram settings and history with the snapshot, inside the
+// import transaction. The token is sealed with the backup's key, which becomes this install's key.
+func restoreTelegram(ctx context.Context, conn *sql.Conn, snap *tgSnapshot, v *vault) error {
+	if _, err := conn.ExecContext(ctx, `DELETE FROM main.settings WHERE `+tgSettingsWhere); err != nil {
+		return err
+	}
+	if _, err := conn.ExecContext(ctx, `DELETE FROM main.telegram_asked`); err != nil {
+		return err
+	}
+	for k, val := range snap.settings {
+		if k == "telegram_token" {
+			enc, err := v.seal(val)
+			if err != nil {
+				return err
+			}
+			val = enc
+		}
+		if _, err := conn.ExecContext(ctx, `INSERT INTO main.settings(key,value) VALUES(?,?)`, k, val); err != nil {
+			return err
+		}
+	}
+	for _, r := range snap.asked {
+		if _, err := conn.ExecContext(ctx, `INSERT INTO main.telegram_asked(key,asked_at,outcome) VALUES(?,?,?)`, r[0], r[1], r[2]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // importBackup replaces all data with the contents of the backup file at path.
-func (a *app) importBackup(path string) (err error) {
+func (a *app) importBackup(path string, opt importOptions) (err error) {
 	key, err := readBackupKey(path)
 	if err != nil {
 		return err
@@ -140,6 +225,12 @@ func (a *app) importBackup(path string) (err error) {
 	newVaultVal, err := newVault(key)
 	if err != nil {
 		return err
+	}
+	var keepTg *tgSnapshot
+	if !opt.MigrateTelegram {
+		if keepTg, err = a.snapshotTelegram(); err != nil {
+			return fmt.Errorf("reading this install's Telegram settings: %w", err)
+		}
 	}
 	// Stage the key file first so that only the final rename can fail after the data is committed.
 	keyTmp := a.keyPath + ".import"
@@ -218,6 +309,11 @@ func (a *app) importBackup(path string) (err error) {
 			return fmt.Errorf("restoring %s: %w", t, err)
 		}
 	}
+	if keepTg != nil {
+		if err := restoreTelegram(ctx, conn, keepTg, newVaultVal); err != nil {
+			return fmt.Errorf("keeping this install's Telegram bot: %w", err)
+		}
+	}
 	if r, err := conn.QueryContext(ctx, `PRAGMA main.foreign_key_check`); err == nil {
 		bad := r.Next()
 		r.Close()
@@ -267,7 +363,8 @@ func (a *app) importUploadBackup(w http.ResponseWriter, r *http.Request) {
 		fail("Could not read the upload: " + err.Error())
 		return
 	}
-	if err := a.importBackup(tmp.Name()); err != nil {
+	opt := importOptions{MigrateTelegram: r.FormValue("telegram") == "on"}
+	if err := a.importBackup(tmp.Name(), opt); err != nil {
 		log.Println("import backup:", err)
 		fail("Import failed, nothing was changed: " + err.Error())
 		return
@@ -282,5 +379,12 @@ func (a *app) importUploadBackup(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login?next="+url.QueryEscape("/settings?msg=Backup+imported.#backup"), http.StatusSeeOther)
 		return
 	}
-	settingsRedirect(w, r, "backup", "Backup imported. All previous data was replaced.", false)
+	msg := "Backup imported. All previous data was replaced."
+	switch {
+	case !opt.MigrateTelegram:
+		msg = "Backup imported. All previous data was replaced, apart from this install's Telegram bot settings."
+	case a.tg.enabled() && a.tg.configured():
+		msg += " The Telegram bot now runs here: stop the old install or switch its bot off, so the two don't compete for messages."
+	}
+	settingsRedirect(w, r, "backup", msg, false)
 }

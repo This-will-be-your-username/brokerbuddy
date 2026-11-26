@@ -536,6 +536,55 @@ func TestExportImportOverwritesEverything(t *testing.T) {
 	}
 }
 
+func TestImportTelegramMigrationOption(t *testing.T) {
+	const srcTok, dstTok = "111111:AAAAAAAAAAAAAAAAAAAAAAAAAAAA", "222222:BBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+	src := testApp(t)
+	src.setSecret("telegram_token", srcTok)
+	src.setSetting("telegram_chat_id", "111")
+	src.setSetting("telegram_hour", "7")
+	src.db.Exec(`INSERT INTO telegram_asked(key,asked_at,outcome) VALUES('from-backup','2026-01-01','skipped')`)
+	src.db.Exec(`INSERT INTO accounts(plaid_account_id,name) VALUES('a1','Everyday')`)
+	src.db.Exec(`INSERT INTO transactions(plaid_txn_id,account_id,date,name,amount) VALUES('t1','a1','2026-01-02','COFFEE',4.5)`)
+	snap := filepath.Join(t.TempDir(), "snap.db")
+	if err := src.exportBackup(snap); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, migrate := range []bool{true, false} {
+		dst := testApp(t)
+		dst.setSecret("telegram_token", dstTok)
+		dst.setSetting("telegram_chat_id", "222")
+		dst.db.Exec(`INSERT INTO telegram_asked(key,asked_at,outcome) VALUES('local','2026-02-01','')`)
+		if err := dst.importBackup(snap, importOptions{MigrateTelegram: migrate}); err != nil {
+			t.Fatal(migrate, err)
+		}
+		var n int
+		dst.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE plaid_txn_id='t1'`).Scan(&n)
+		if n != 1 {
+			t.Errorf("migrate=%v: the rest of the backup must be imported", migrate)
+		}
+		var asked string
+		dst.db.QueryRow(`SELECT group_concat(key) FROM telegram_asked`).Scan(&asked)
+		tok, chat, hour := dst.getSecret("telegram_token"), dst.getSetting("telegram_chat_id"), dst.getSetting("telegram_hour")
+		if migrate && (tok != srcTok || chat != "111" || hour != "7" || asked != "from-backup") {
+			t.Errorf("migrated bot: token %q chat %q hour %q asked %q", tok, chat, hour, asked)
+		}
+		if !migrate && (tok != dstTok || chat != "222" || hour != "" || asked != "local") {
+			t.Errorf("kept bot: token %q chat %q hour %q asked %q", tok, chat, hour, asked)
+		}
+		// the kept token was re-sealed with the imported key, so it survives a restart
+		dst.db.Close()
+		again, err := newApp(dst.dbPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := again.getSecret("telegram_token"); got != tok {
+			t.Errorf("migrate=%v: token after restart %q", migrate, got)
+		}
+		again.db.Close()
+	}
+}
+
 func mustKey(t *testing.T, a *app) string {
 	k, err := loadOrCreateKey(a.keyPath)
 	if err != nil {

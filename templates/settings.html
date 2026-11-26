@@ -233,6 +233,8 @@ section.card{scroll-margin-top:12px}
   <p class="mut small"><strong>This replaces all existing data</strong>: accounts, transactions, rules and settings (including the password and the encryption key) are overwritten by the backup, and cannot be recovered. Export first if you might need what is here now. You will be signed out; sign in with the backup's password if it has one.</p>
   <form method="post" action="/settings/import" enctype="multipart/form-data" class="stack" onsubmit="return confirm('Replace ALL existing data with this backup? This cannot be undone.')">
     <label class="f">Backup file<input type="file" name="file" accept=".db,.sqlite,.sqlite3,application/vnd.sqlite3" required></label>
+    <label class="small"><input type="checkbox" name="telegram" checked> Migrate the Telegram bot from the backup</label>
+    <p class="mut small" style="margin-top:-6px">A Telegram bot can only run on one install at a time. Leave this ticked when moving to this computer, and stop the old install afterwards. Untick it to keep this install's own Telegram settings (or none), for example when the old install will keep running with the bot.</p>
     <label class="small"><input type="checkbox" name="confirm" required> I understand this deletes everything currently stored and replaces it with the backup</label>
     <div><button class="danger">Import &amp; overwrite</button></div>
   </form>

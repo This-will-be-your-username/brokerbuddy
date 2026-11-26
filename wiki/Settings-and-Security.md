@@ -51,6 +51,11 @@ Secrets in the database (Plaid secret, bank access tokens, the private key of an
 
 Copy `brokerbuddy.db` and `brokerbuddy.db.key` while the app is stopped, or use SQLite's backup tooling. To move to another computer, copy both files and start the app with `-db` pointing at the copy.
 
+You can also use **Settings → Backup & migration**: **Export database** saves everything (key included) as one file, and **Import a backup** on the other install replaces all of its data with that file. The import form has a **Migrate the Telegram bot from the backup** option. A bot can only run on one install at a time, so:
+
+- leave it ticked when moving to the new computer, then stop the old install (or switch its bot off);
+- untick it to keep the importing install's own Telegram settings (or none), for example when the old install keeps running with the bot.
+
 ## Removing everything
 
 Stop the app and delete the database and key files. Nothing is stored anywhere else.
