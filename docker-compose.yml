@@ -1,18 +1,15 @@
-# docker compose up -d   then open https://localhost:8443
-# Every ${VAR:-default} below can be overridden in the shell or in a .env file next to this one.
+---
 services:
   brokerbuddy:
-    image: ${BROKERBUDDY_IMAGE:-ghcr.io/this-will-be-your-username/brokerbuddy:latest}
-    pull_policy: ${BROKERBUDDY_PULL:-always}   # always fetch the newest image from GitHub; "missing" reuses a local copy
+    image: ghcr.io/this-will-be-your-username/brokerbuddy:latest
     container_name: brokerbuddy
-    restart: unless-stopped
-    ports:
-      # Loopback only by default. Set BROKERBUDDY_BIND=0.0.0.0 only after setting a password in Settings.
-      - "${BROKERBUDDY_BIND:-127.0.0.1}:${BROKERBUDDY_PORT:-8443}:8443"
-    volumes:
-      - ${BROKERBUDDY_DATA:-brokerbuddy-data}:/data   # a volume name, or a folder path for a bind mount
+    pull_policy: always
     environment:
-      TZ: ${TZ:-UTC}
-
-volumes:
-  brokerbuddy-data:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - /path/to/brokerbuddy/data:/data
+    ports:
+      - 127.0.0.1:8443:8443
+    restart: unless-stopped

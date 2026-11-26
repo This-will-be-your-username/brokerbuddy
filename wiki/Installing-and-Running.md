@@ -142,44 +142,68 @@ To use Let's Encrypt on ports 80 and 443 as a non-root user, allow the binary to
 
 Images are published to GitHub Container Registry as `ghcr.io/<owner>/brokerbuddy` for `linux/amd64` and `linux/arm64`. Tags: `latest` (the newest release), a version such as `1.2.3` or `1.2`, and `edge` (the current main branch).
 
-```
-docker run -d --name brokerbuddy \
-  -p 127.0.0.1:8443:8443 \
-  -v brokerbuddy-data:/data \
-  ghcr.io/<owner>/brokerbuddy:latest
-```
+The image follows the [linuxserver.io](https://docs.linuxserver.io/general/understanding-puid-and-pgid/) conventions: you pass `PUID`, `PGID` and `TZ`, and mount a folder at `/data`.
 
-Then open https://127.0.0.1:8443.
-
-What matters:
-
-- **`-v brokerbuddy-data:/data`** keeps your database and key file in a Docker volume. Without a volume your data is lost when the container is removed. Back up the volume ([below](#backing-up-a-container)).
-- **`-p 127.0.0.1:8443:8443`** publishes the port on this computer only. Inside a container the app listens on all interfaces, so publishing to `8443:8443` without the `127.0.0.1` makes it reachable from your network. With no password set, the app still refuses requests that do not use a localhost address, but set a password under Settings before exposing it to a network.
-- The container runs as a non-root user and includes CA certificates for lookups and Let's Encrypt.
-
-### Docker Compose
+### Docker Compose (recommended)
 
 The repository has a `docker-compose.yml`:
+
+```yaml
+---
+services:
+  brokerbuddy:
+    image: ghcr.io/<owner>/brokerbuddy:latest
+    container_name: brokerbuddy
+    pull_policy: always
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - /path/to/brokerbuddy/data:/data
+    ports:
+      - 127.0.0.1:8443:8443
+    restart: unless-stopped
+```
+
+Edit it before the first start: change `/path/to/brokerbuddy/data` to a folder on your computer, and set `PUID`/`PGID` to your user's ids (run `id`). Then:
 
 ```
 docker compose up -d
 docker compose logs -f
 docker compose pull && docker compose up -d     # update
-docker compose down                             # stop (your data volume is kept)
+docker compose down                             # stop (your data folder is kept)
 ```
 
-Every setting has a default and can be overridden in the shell or in a `.env` file next to `docker-compose.yml`:
+### docker cli
 
-| Variable | Default | Meaning |
-|----------|---------|---------|
-| `BROKERBUDDY_IMAGE` | `ghcr.io/<owner>/brokerbuddy:latest` | Image to run |
-| `BROKERBUDDY_PORT` | `8443` | Port on the host |
-| `BROKERBUDDY_BIND` | `127.0.0.1` | Host address to publish on; `0.0.0.0` exposes it to your network, so set a password first |
-| `BROKERBUDDY_DATA` | `brokerbuddy-data` | Volume name, or a folder path for a bind mount |
-| `BROKERBUDDY_PULL` | `always` | `always` fetches the newest image from GitHub on each `up`; `missing` reuses a local copy |
-| `TZ` | `UTC` | Time zone |
+```
+docker run -d \
+  --name=brokerbuddy \
+  -e PUID=1000 \
+  -e PGID=1000 \
+  -e TZ=Etc/UTC \
+  -p 127.0.0.1:8443:8443 \
+  -v /path/to/brokerbuddy/data:/data \
+  --restart unless-stopped \
+  ghcr.io/<owner>/brokerbuddy:latest
+```
 
-Compose pulls the published image and never builds locally. To build from source instead, use `docker build -t brokerbuddy .` and set `BROKERBUDDY_IMAGE=brokerbuddy` and `BROKERBUDDY_PULL=never`.
+Then open https://127.0.0.1:8443.
+
+### Parameters
+
+| Parameter | Function |
+|-----------|----------|
+| `-p 127.0.0.1:8443:8443` | The web interface (HTTPS). The `127.0.0.1` publishes it on this computer only. Inside a container the app listens on all interfaces, so `8443:8443` without it makes the app reachable from your network. With no password set, the app still refuses requests that do not use a localhost address, but set a password under Settings before exposing it. |
+| `-e PUID=1000` | User id the app runs as. Files in `/data` are owned by it. |
+| `-e PGID=1000` | Group id the app runs as. |
+| `-e TZ=Etc/UTC` | Time zone, from [this list](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones#List), for example `Australia/Sydney`. |
+| `-v /data` | Your database and key file. Without it your data is lost when the container is removed. A named volume (`-v brokerbuddy-data:/data`) also works. |
+
+On start the container fixes the ownership of `/data` to `PUID:PGID` and then drops root, so a folder Docker creates for you, or a volume from an older image, needs no manual `chown`. The image includes CA certificates for lookups and Let's Encrypt.
+
+Compose pulls the published image and never builds locally. To run an image you built yourself (`docker build -t brokerbuddy .`), set `image: brokerbuddy` and `pull_policy: never`.
 
 ### Day-to-day commands
 
@@ -191,7 +215,7 @@ docker pull ghcr.io/<owner>/brokerbuddy:latest
 docker rm -f brokerbuddy                   # remove the old container (the volume stays)
 ```
 
-After pulling, repeat the `docker run` command above to start the new version. Updating never touches the `brokerbuddy-data` volume, so your data carries over. Take a backup first (below) before a major version change.
+After pulling, repeat the `docker run` command above to start the new version. Updating never touches your `/data` folder or volume, so your data carries over. Take a backup first (below) before a major version change.
 
 ### Demo mode in a container
 
@@ -203,23 +227,25 @@ The container's entrypoint already supplies `-db` and `-addr`; arguments you add
 
 ### Backing up a container
 
+With a folder mounted at `/data`, stop the container and copy the folder: it holds the database and the key file together, which is what you must keep.
+
+With a named volume:
+
 ```
 docker run --rm -v brokerbuddy-data:/data -v "$PWD":/backup alpine \
   tar czf /backup/brokerbuddy-backup.tgz -C /data .
 ```
 
-The archive holds the database and the key file together, which is what you must keep. Store it somewhere safe. On Windows PowerShell use `${PWD}` in place of `"$PWD"`.
+Store the archive somewhere safe. On Windows PowerShell use `${PWD}` in place of `"$PWD"`.
 
 To restore it into a volume, stop the container first, then:
 
 ```
 docker run --rm -v brokerbuddy-data:/data -v "$PWD":/backup alpine \
   tar xzf /backup/brokerbuddy-backup.tgz -C /data
-docker run --rm --user root --entrypoint sh -v brokerbuddy-data:/data ghcr.io/<owner>/brokerbuddy:latest \
-  -c "chown -R brokerbuddy:brokerbuddy /data"
 ```
 
-The second command makes sure the container's own user owns the restored files.
+The container sets the owner of the restored files to `PUID:PGID` when it next starts.
 
 Alternatively, use the in-app database export and import under Settings, which needs no Docker commands.
 
@@ -229,13 +255,9 @@ Alternatively, use the in-app database export and import under Settings, which n
 docker build -t brokerbuddy .
 ```
 
-### Using a bind mount instead of a volume
+### Running without root
 
-```
-docker run -d -p 127.0.0.1:8443:8443 -v /srv/brokerbuddy:/data ghcr.io/<owner>/brokerbuddy:latest
-```
-
-The container user must be able to write the folder. If it cannot, either change the folder owner to the container user (find its ids with `docker run --rm --entrypoint id ghcr.io/<owner>/brokerbuddy:latest`) or run the container as yourself with `--user "$(id -u):$(id -g)"`.
+If you start the container with `--user "$(id -u):$(id -g)"` (or `user:` in Compose), it runs as that user from the start, ignores `PUID`/`PGID` and does not change any ownership. The folder mounted at `/data` must then already be writable by that user.
 
 ## Raspberry Pi and NAS devices
 

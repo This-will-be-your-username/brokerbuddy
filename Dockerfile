@@ -15,15 +15,16 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
 
 FROM alpine:3.20
 # CA certificates: merchant lookups, mortgage rates and Let's Encrypt use HTTPS.
-RUN apk add --no-cache ca-certificates tzdata \
-    && addgroup -S brokerbuddy && adduser -S -G brokerbuddy -h /data brokerbuddy \
-    && mkdir -p /data && chown brokerbuddy:brokerbuddy /data
+# su-exec: the entrypoint starts as root, fixes /data ownership, then drops to PUID:PGID
+# (the linuxserver.io convention; defaults 1000:1000).
+RUN apk add --no-cache ca-certificates tzdata su-exec && mkdir -p /data
 COPY --from=build /out/brokerbuddy /usr/local/bin/brokerbuddy
-USER brokerbuddy
+COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+ENV HOME=/data PUID=1000 PGID=1000
 WORKDIR /data
 # Your database and its key file live here: mount a volume so they survive the container.
 VOLUME ["/data"]
 EXPOSE 8443
 # Inside a container the app must listen on all interfaces. Publish the port on the host's
 # loopback only (-p 127.0.0.1:8443:8443) unless you have set a password.
-ENTRYPOINT ["brokerbuddy", "-db", "/data/brokerbuddy.db", "-addr", "0.0.0.0:8443"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
