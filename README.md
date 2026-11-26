@@ -23,7 +23,15 @@ Your data stays on your computer, in one SQLite file. There are no paid services
 **Download** a build for Windows, macOS or Linux (Intel or ARM) from the [Releases](https://github.com/This-will-be-your-username/brokerbuddy/releases) page, run it, and open **https://127.0.0.1:8443**. Or use Docker:
 
 ```
-docker run -d -p 127.0.0.1:8443:8443 -v brokerbuddy-data:/data ghcr.io/this-will-be-your-username/brokerbuddy:latest
+docker compose up -d      # after setting the data folder and PUID/PGID in docker-compose.yml
+```
+
+or without Compose:
+
+```
+docker run -d --name=brokerbuddy -e PUID=1000 -e PGID=1000 -e TZ=Etc/UTC \
+  -p 127.0.0.1:8443:8443 -v /path/to/brokerbuddy/data:/data \
+  --restart unless-stopped ghcr.io/this-will-be-your-username/brokerbuddy:latest
 ```
 
 Or run from source with a recent [Go](https://go.dev/dl/) (the version is in `go.mod`):

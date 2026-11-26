@@ -12,10 +12,18 @@ From source you need a recent [Go](https://go.dev/dl/) toolchain (the version is
 go run .
 ```
 
-or, with a downloaded release, run `brokerbuddy` (`brokerbuddy.exe` on Windows). With Docker:
+or, with a downloaded release, run `brokerbuddy` (`brokerbuddy.exe` on Windows). With Docker, edit the data folder and `PUID`/`PGID` in the repository's `docker-compose.yml` (see [Docker Compose](Installing-and-Running#docker-compose-recommended)), then:
 
 ```
-docker run -d -p 127.0.0.1:8443:8443 -v brokerbuddy-data:/data ghcr.io/<owner>/brokerbuddy:latest
+docker compose up -d
+```
+
+or without Compose:
+
+```
+docker run -d --name=brokerbuddy -e PUID=1000 -e PGID=1000 -e TZ=Etc/UTC \
+  -p 127.0.0.1:8443:8443 -v /path/to/brokerbuddy/data:/data \
+  --restart unless-stopped ghcr.io/<owner>/brokerbuddy:latest
 ```
 
 Open **https://127.0.0.1:8443**. The certificate is self-signed and generated once, so your browser warns you the first time. Accept it once; it is kept between runs.

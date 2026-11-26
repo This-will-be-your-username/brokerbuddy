@@ -254,7 +254,6 @@ Alternatively, use the in-app database export and import under Settings, which n
 ```
 docker build -t brokerbuddy .
 ```
-
 ### Running without root
 
 If you start the container with `--user "$(id -u):$(id -g)"` (or `user:` in Compose), it runs as that user from the start, ignores `PUID`/`PGID` and does not change any ownership. The folder mounted at `/data` must then already be writable by that user.
@@ -299,7 +298,7 @@ If port 8443 is taken, pick another:
 brokerbuddy -addr 127.0.0.1:9443
 ```
 
-In Docker, change only the published side: `-p 127.0.0.1:9443:8443`.
+In Docker, change only the published side: `-p 127.0.0.1:9443:8443`, or `- 127.0.0.1:9443:8443` under `ports:` in `docker-compose.yml`.
 
 ## Updating
 
@@ -307,7 +306,7 @@ Replace the program (or pull the new image) and start it again. The database is 
 
 ## Stopping and uninstalling
 
-Stop the process (Ctrl+C, or `docker stop brokerbuddy`). To uninstall, delete the program. Your data stays until you delete `brokerbuddy.db` and `brokerbuddy.db.key` (or the Docker volume with `docker volume rm brokerbuddy-data`).
+Stop the process (Ctrl+C, or `docker stop brokerbuddy`). To uninstall, delete the program. Your data stays until you delete `brokerbuddy.db` and `brokerbuddy.db.key` (in Docker, the folder you mounted at `/data`, or the volume with `docker volume rm brokerbuddy-data` if you used a named volume).
 
 ## Troubleshooting
 
@@ -317,6 +316,7 @@ Stop the process (Ctrl+C, or `docker stop brokerbuddy`). To uninstall, delete th
 | Browser cannot connect in Docker | Check the container is running (`docker ps`), and that you used `https://` (not `http://`). |
 | 403 "only answers on this computer" | No password is set and you opened the app by a non-local address. Use `127.0.0.1` or `localhost`, or set a password from the local address. |
 | Data missing after restart in Docker | The container ran without a volume. Always mount `/data`. |
+| "permission denied" writing `/data` in Docker | Check `PUID`/`PGID` match the owner of the host folder (`id`). If you run with `--user`, that user must already be able to write the folder. |
 | macOS or Windows refuses to open it | See the Gatekeeper and SmartScreen notes above. |
 
 More in [FAQ and troubleshooting](FAQ-and-Troubleshooting).
