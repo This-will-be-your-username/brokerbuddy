@@ -166,19 +166,42 @@ func clientIP(r *http.Request) string {
 	return h
 }
 
-// isLocalHost reports whether the Host header names this computer. Without a password, only such
-// requests are served, which also blocks DNS-rebinding attacks from other websites.
-func isLocalHost(host string) bool {
+// isLocalNetworkIP reports whether ip is this computer or on a private/link-local network.
+func isLocalNetworkIP(ip net.IP) bool {
+	return ip != nil && (ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast())
+}
+
+// isLocalNetworkHost reports whether the Host header names this computer or something on the
+// local network: an IP address, localhost, or a name that public DNS can't serve (single-label,
+// .local, .lan, .home.arpa, .internal). Requiring this blocks DNS-rebinding attacks from other
+// websites, which always arrive with the attacker's public domain in Host.
+func isLocalNetworkHost(host string) bool {
 	h, _, err := net.SplitHostPort(host)
 	if err != nil {
 		h = host
 	}
-	h = strings.Trim(h, "[]")
-	if h == "localhost" || strings.HasSuffix(h, ".localhost") {
+	h = strings.ToLower(strings.TrimSuffix(strings.Trim(h, "[]"), "."))
+	if h == "" {
+		return false
+	}
+	if ip := net.ParseIP(h); ip != nil {
+		return isLocalNetworkIP(ip)
+	}
+	if !strings.Contains(h, ".") || h == "localhost" {
 		return true
 	}
-	ip := net.ParseIP(h)
-	return ip != nil && ip.IsLoopback()
+	for _, s := range []string{".localhost", ".local", ".lan", ".home.arpa", ".internal", ".localdomain"} {
+		if strings.HasSuffix(h, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// fromLocalNetwork reports whether a request comes from, and is addressed to, the local network.
+// Without a password only such requests are served, so the app is never open to the internet.
+func fromLocalNetwork(r *http.Request) bool {
+	return isLocalNetworkIP(net.ParseIP(clientIP(r))) && isLocalNetworkHost(r.Host)
 }
 
 func (a *app) hasPassword() bool { return a.getSetting("password_hash") != "" }
@@ -193,7 +216,7 @@ func (a *app) startSession(w http.ResponseWriter) {
 		SameSite: http.SameSiteLaxMode, MaxAge: 30 * 24 * 3600})
 }
 
-// auth protects every page. With no password set the app is open, but only to this computer.
+// auth protects every page. With no password set the app is open, but only on the local network.
 func (a *app) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
@@ -202,8 +225,8 @@ func (a *app) auth(next http.Handler) http.Handler {
 			return
 		}
 		if !a.hasPassword() {
-			if !isLocalHost(r.Host) {
-				http.Error(w, "No password is set, so BrokerBuddy only answers on this computer. Open Settings locally and set a password first.", http.StatusForbidden)
+			if !fromLocalNetwork(r) {
+				http.Error(w, "No password is set, so BrokerBuddy only answers on your local network. Open Settings from a device on that network and set a password first.", http.StatusForbidden)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -406,7 +429,7 @@ func (a *app) removePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	a.setSetting("password_hash", "")
 	a.sess.clear()
-	settingsRedirect(w, r, "security", "Password removed. BrokerBuddy now only answers on this computer.", false)
+	settingsRedirect(w, r, "security", "Password removed. BrokerBuddy now only answers on your local network.", false)
 }
 
 var hostnameRe = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$`)

@@ -177,7 +177,7 @@ section.card{scroll-margin-top:12px}
 <section class="card" id="security">
   <h2>Password</h2>
   {{if .HasPassword}}<p class="mut small">A password is set. You can change it below.</p>
-  {{else}}<p class="mut small">No password is set, so BrokerBuddy only answers on this computer. Set one to allow access from other devices or the internet.</p>{{end}}
+  {{else}}<p class="mut small">No password is set, so anyone on your local network can open BrokerBuddy, and it refuses connections from the internet. Set one to protect it on your network and allow access from the internet.</p>{{end}}
   <form method="post" action="/settings/password" class="stack">
     <div class="fields">
       {{if .HasPassword}}<label class="f">Current password<input type="password" name="current" autocomplete="current-password" required></label>{{end}}

@@ -195,7 +195,7 @@ Then open https://127.0.0.1:8443.
 
 | Parameter | Function |
 |-----------|----------|
-| `-p 127.0.0.1:8443:8443` | The web interface (HTTPS). The `127.0.0.1` publishes it on this computer only. Inside a container the app listens on all interfaces, so `8443:8443` without it makes the app reachable from your network. With no password set, the app still refuses requests that do not use a localhost address, but set a password under Settings before exposing it. |
+| `-p 127.0.0.1:8443:8443` | The web interface (HTTPS). The `127.0.0.1` publishes it on this computer only. Inside a container the app listens on all interfaces, so `8443:8443` without it makes the app reachable from your network. With no password set, the app answers anyone on your local network (but not the internet), so set a password under Settings right away. |
 | `-e PUID=1000` | User id the app runs as. Files in `/data` are owned by it. |
 | `-e PGID=1000` | Group id the app runs as. |
 | `-e TZ=Etc/UTC` | Time zone, from [this list](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones#List), for example `Australia/Sydney`. |
@@ -314,7 +314,7 @@ Stop the process (Ctrl+C, or `docker stop brokerbuddy`). To uninstall, delete th
 |---------|-----|
 | "address already in use" | Another program uses the port. Choose another with `-addr`. |
 | Browser cannot connect in Docker | Check the container is running (`docker ps`), and that you used `https://` (not `http://`). |
-| 403 "only answers on this computer" | No password is set and you opened the app by a non-local address. Use `127.0.0.1` or `localhost`, or set a password from the local address. |
+| 403 "only answers on your local network" | No password is set and the request came from a public address, or used a public domain name. Open it by the server's LAN IP (for example `https://192.168.1.20:8443`) or a local name like `nas.local`, then set a password. |
 | Data missing after restart in Docker | The container ran without a volume. Always mount `/data`. |
 | "permission denied" writing `/data` in Docker | Check `PUID`/`PGID` match the owner of the host folder (`id`). If you run with `--user`, that user must already be able to write the folder. |
 | macOS or Windows refuses to open it | See the Gatekeeper and SmartScreen notes above. |

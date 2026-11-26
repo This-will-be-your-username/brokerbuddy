@@ -89,16 +89,33 @@ func TestSecretsAreEncryptedAtRest(t *testing.T) {
 	}
 }
 
-func TestOpenOnlyOnLocalhostWithoutPassword(t *testing.T) {
+func TestOpenOnlyOnLocalNetworkWithoutPassword(t *testing.T) {
 	a := testApp(t)
 	h := a.routes()
-	for host, want := range map[string]int{"127.0.0.1:8443": 200, "localhost:8443": 200, "[::1]:8443": 200, "evil.example.com": 403, "192.168.1.20:8443": 403} {
+	cases := []struct {
+		remote, host string
+		want         int
+	}{
+		{"127.0.0.1:5000", "127.0.0.1:8443", 200},
+		{"127.0.0.1:5000", "localhost:8443", 200},
+		{"[::1]:5000", "[::1]:8443", 200},
+		{"192.168.1.50:5000", "192.168.1.20:8443", 200},
+		{"10.0.0.5:5000", "nas.local:8443", 200},
+		{"172.17.0.1:5000", "brokerbuddy:8443", 200},
+		{"[fe80::1]:5000", "[fe80::2]:8443", 200},
+		{"192.168.1.50:5000", "evil.example.com", 403}, // DNS rebinding
+		{"203.0.113.9:5000", "192.168.1.20:8443", 403}, // from the internet
+		{"203.0.113.9:5000", "localhost:8443", 403},
+		{"192.168.1.50:5000", "203.0.113.1:8443", 403},
+	}
+	for _, c := range cases {
 		r := httptest.NewRequest("GET", "/charts", nil)
-		r.Host = host
+		r.RemoteAddr = c.remote
+		r.Host = c.host
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
-		if w.Code != want {
-			t.Errorf("host %q: got %d want %d", host, w.Code, want)
+		if w.Code != c.want {
+			t.Errorf("remote %q host %q: got %d want %d", c.remote, c.host, w.Code, c.want)
 		}
 	}
 }
@@ -412,6 +429,7 @@ func TestSameOriginCheck(t *testing.T) {
 	}
 	for _, c := range cases {
 		r := httptest.NewRequest("POST", "/recategorize", nil)
+		r.RemoteAddr = "127.0.0.1:5000"
 		r.Host = "127.0.0.1:8443"
 		for k, v := range c.headers {
 			r.Header.Set(k, v)
@@ -424,6 +442,7 @@ func TestSameOriginCheck(t *testing.T) {
 	}
 	// GET is never blocked by this check
 	r := httptest.NewRequest("GET", "/charts", nil)
+	r.RemoteAddr = "127.0.0.1:5000"
 	r.Host = "127.0.0.1:8443"
 	r.Header.Set("Sec-Fetch-Site", "cross-site")
 	w := httptest.NewRecorder()

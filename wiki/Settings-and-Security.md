@@ -18,14 +18,14 @@ All configuration is done in the web interface under **Settings**. There are no 
 
 ## Password
 
-With **no password**, the app answers only on this computer: it refuses requests whose Host header is not local, which also blocks DNS-rebinding attacks from other websites.
+With **no password**, the app answers only on your local network, so a headless install can be set up from another device. It refuses requests from public internet addresses, and requests whose Host header is not an IP address, `localhost` or a local-only name (a single-label name, or one ending in `.local`, `.lan`, `.home.arpa` or `.internal`), which also blocks DNS-rebinding attacks from other websites. Anyone on your network can open it until you set a password, so set one first.
 
 With a password (8 or more characters):
 
 - Passwords are stored as bcrypt hashes.
 - Sign-in is rate limited per client address.
 - Sessions use a cookie that is HTTP-only and secure.
-- Anything beyond this computer (an internet or network address) **requires** a password.
+- The extra listeners under Access and HTTPS (internet or your own certificate) **require** a password.
 
 ## Access and HTTPS
 
