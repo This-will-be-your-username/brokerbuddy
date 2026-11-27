@@ -17,6 +17,7 @@ Only things you trigger, and only these:
 | Mortgage rates | Nothing personal: public requests for published rate data | Bank product APIs under the Consumer Data Right, and the CDR register | You click *Search for current rates* |
 | Plaid (optional) | What Plaid needs to link your bank | Plaid | You set up Plaid |
 | Telegram bot (optional) | A daily question with one transaction's description, date and amount, and your replies | Telegram | You turn the bot on in Settings. The merchant lookup it does still sends only the cleaned name |
+| AI (optional) | One transaction's description, merchant, date and amount, plus your category names | The LLM provider you choose (nothing leaves your network with a local model) | You press *Ask AI* in Telegram, or save AI settings with the test ticked (a sample transaction) |
 | Let's Encrypt (optional) | Your domain and email | Let's Encrypt | You choose that access mode |
 
 Lookups **never** send amounts, dates, account names or numbers, the full bank description, or people's names. The cleaned name strips store numbers, suburbs, states and payment wording first. Results are cached, so the same merchant is not searched twice.

@@ -155,6 +155,7 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("POST /settings/plaid", a.savePlaid)
 	mux.HandleFunc("POST /settings/telegram", a.saveTelegram)
 	mux.HandleFunc("POST /settings/telegram/ask", a.telegramAskNow)
+	mux.HandleFunc("POST /settings/ai", a.saveLLM)
 	mux.HandleFunc("POST /settings/password", a.savePassword)
 	mux.HandleFunc("POST /settings/password/remove", a.removePassword)
 	mux.HandleFunc("POST /settings/network", a.saveNetwork)

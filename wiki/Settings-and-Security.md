@@ -12,6 +12,7 @@ All configuration is done in the web interface under **Settings**. There are no 
 | Categorisation | Your rules, repayments from other people, merchant lookups, reprocessing |
 | Demo data | Load or remove the [demo data](Demo-Data) |
 | Telegram | Optional bot that asks about one uncategorised transaction a day, see [Telegram bot](#telegram-bot) |
+| AI | Optional LLM the Telegram bot can ask for a category, see [AI](#ai-llm) |
 | Password | Set or remove the password |
 | Access & HTTPS | Who can reach the app and over what certificate |
 | Your data | Where the database and key file are, how to back up |
@@ -79,3 +80,14 @@ Reply with a number, a category name (a part is enough, such as `dining`) or `sk
 Reply `more` (or tap **More categories**) to see every category and pick one. Commands: `/next` asks about another one now, `/status` shows how many transactions still need a category, `/skip` and `/help`. **Ask me about one now** in Settings does the same as `/next`.
 
 **Security**: the bot only answers the configured chat. Anyone else who messages it is ignored (apart from `/start`, which tells them their own chat ID). The token is stored encrypted. Telegram sees the question and your replies, including the description and amount, so use a private chat that only you can read. See [Privacy](Privacy).
+
+## AI (LLM)
+
+Optionally connect a large language model in **Settings → AI**. The Telegram bot's question then has an **Ask AI** button (or reply `ai`, or send `/ai`). The model is given the transaction and your list of categories and answers with the most likely category, how sure it is and a one-line reason. You get a **Use …** button for its answer, plus **More categories** and **Skip**: the AI never categorises anything by itself.
+
+- **Anthropic (Claude)**: paste an API key. The model defaults to `claude-opus-5-5`; enter another model ID to change it.
+- **OpenAI-compatible**: OpenAI, OpenRouter, or a local model. Enter the model name and, for anything other than OpenAI, the API address, such as `http://localhost:11434/v1` for Ollama or `http://localhost:1234/v1` for LM Studio. Local servers usually need no key.
+
+Saving with **Send a test question** ticked asks the model about a sample transaction so a wrong key, address or model shows up straight away. The API key is stored encrypted.
+
+**Privacy**: only when you press Ask AI, the provider receives that transaction's description, merchant, date and amount, plus your category names. A model running on your own network keeps all of that at home. See [Privacy](Privacy).

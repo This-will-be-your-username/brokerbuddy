@@ -282,6 +282,10 @@ func (b *telegramBot) dispatch(ctx context.Context, u tgUpdate) {
 			go b.askAndReport(ctx)
 			return
 		}
+		if isAIText(text) {
+			go b.askAI(ctx, chat, 0)
+			return
+		}
 		if isMoreText(text) {
 			b.sendMore(ctx, chat, 0)
 			return
@@ -297,6 +301,11 @@ func (b *telegramBot) dispatch(ctx context.Context, u tgUpdate) {
 		b.call(ctx, "answerCallbackQuery", map[string]any{"callback_query_id": cb.ID}, nil)
 		if cb.Data == tgNextData {
 			go b.askAndReport(ctx)
+			return
+		}
+		if seq, ok := strings.CutPrefix(cb.Data, "ai:"); ok {
+			n, _ := strconv.ParseInt(seq, 10, 64)
+			go b.askAI(ctx, chat, n)
 			return
 		}
 		if seq, ok := strings.CutPrefix(cb.Data, "more:"); ok {
@@ -506,7 +515,12 @@ func (b *telegramBot) ask(ctx context.Context) error {
 	if lookedUp {
 		sb.WriteString("\nIncludes an online lookup of the merchant name.")
 	}
-	sb.WriteString("\nReply with a number, a category name, \"more\" for every category, or \"skip\".")
+	if b.a.llmEnabled() {
+		sb.WriteString("\nReply with a number, a category name, \"ai\" to ask the AI, \"more\" for every category, or \"skip\".")
+		kb = append(kb, []tgButton{{"Ask AI", fmt.Sprintf("ai:%d", p.Seq)}})
+	} else {
+		sb.WriteString("\nReply with a number, a category name, \"more\" for every category, or \"skip\".")
+	}
 	kb = append(kb, []tgButton{{"More categories", fmt.Sprintf("more:%d", p.Seq)}, {"Skip", fmt.Sprintf("skip:%d", p.Seq)}})
 
 	if err := b.send(ctx, sb.String(), kb); err != nil {
@@ -536,6 +550,7 @@ const tgHelp = `I ask about one uncategorised transaction a day. Reply with a nu
 
 /next - ask about another one now
 /more - list every category
+/ai - ask the AI (if set up in Settings) which category it is
 /skip - skip the current question
 /status - how many transactions still need a category
 /help - this message`
@@ -558,7 +573,7 @@ func (b *telegramBot) handle(text string) string {
 		return b.resolve("skip", 0)
 	case "/more":
 		return b.moreText()
-	case "/next":
+	case "/next", "/ai":
 		return "" // handled by the caller, which needs the network
 	case "":
 		if isMoreText(text) {
@@ -850,6 +865,78 @@ func (b *telegramBot) sendMore(ctx context.Context, chat int64, seq int64) {
 	}
 	kb = append(kb, []tgButton{{"Skip", fmt.Sprintf("skip:%d", p.Seq)}})
 	if err := b.send(ctx, "Tap a category for “"+p.Name+"”, or type its name.", kb); err != nil {
+		b.setErr(err)
+	}
+}
+
+// ---- asking the AI -----------------------------------------------------------------
+
+func isAIText(text string) bool {
+	switch strings.ToLower(strings.TrimSpace(text)) {
+	case "ai", "ask ai":
+		return true
+	}
+	return commandOf(text) == "/ai"
+}
+
+// askAI asks the configured LLM which category the open question's transaction most likely is,
+// and replies with its answer and a button to use it. The user still makes the choice. seq > 0
+// (from a button) must match the current question.
+func (b *telegramBot) askAI(ctx context.Context, chat int64, seq int64) {
+	b.mu.Lock()
+	p, ok := b.pending()
+	b.mu.Unlock()
+	switch {
+	case !ok:
+		b.reply(ctx, chat, "There's no open question. Send /next and I'll pick one.")
+		return
+	case seq != 0 && seq != p.Seq:
+		b.reply(ctx, chat, "That question has been replaced. Please answer the latest one.")
+		return
+	case !b.a.llmEnabled():
+		b.reply(ctx, chat, "AI isn't set up. Add a provider under Settings → AI in BrokerBuddy.")
+		return
+	}
+	t := llmTxn{Name: p.Name}
+	if err := b.a.db.QueryRow(`SELECT name, merchant, date, amount FROM transactions WHERE plaid_txn_id=?`, p.TxnID).
+		Scan(&t.Name, &t.Merchant, &t.Date, &t.Amount); err != nil {
+		b.reply(ctx, chat, "That transaction no longer exists (it may have been deleted or re-imported).")
+		return
+	}
+	if hints, err := b.a.localSuggestions(t.Name, t.Merchant, t.Amount); err == nil {
+		t.Hints = hints
+	}
+	b.call(ctx, "sendChatAction", map[string]any{"chat_id": chat, "action": "typing"}, nil)
+
+	actx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	ans, err := b.a.llmSuggest(actx, t)
+	if err != nil {
+		if ctx.Err() == nil {
+			b.reply(ctx, chat, "Sorry, I couldn't get an answer from the AI: "+err.Error())
+		}
+		return
+	}
+	idx := 0
+	for i, c := range pickableCategories() {
+		if c == ans.Category {
+			idx = i + 1
+		}
+	}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "AI suggestion for “%s”:\n\n%s", p.Name, ans.Category)
+	if ans.Confidence > 0 {
+		fmt.Fprintf(&sb, " (%d%% sure)", ans.Confidence)
+	}
+	if ans.Reason != "" {
+		sb.WriteString("\n" + ans.Reason)
+	}
+	sb.WriteString("\n\nUse it, pick another category, or skip.")
+	kb := [][]tgButton{
+		{{"Use " + ans.Category, fmt.Sprintf("cat:%d:%d", p.Seq, idx)}},
+		{{"More categories", fmt.Sprintf("more:%d", p.Seq)}, {"Skip", fmt.Sprintf("skip:%d", p.Seq)}},
+	}
+	if err := b.send(ctx, sb.String(), kb); err != nil && ctx.Err() == nil {
 		b.setErr(err)
 	}
 }

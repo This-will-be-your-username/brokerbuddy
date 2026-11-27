@@ -28,7 +28,7 @@ section.card{scroll-margin-top:12px}
 </header>
 {{if .Flash}}<div class="card flash" role="status">{{.Flash}}</div>{{end}}
 {{if .Error}}<div class="card neg" role="alert">{{.Error}}</div>{{end}}
-<div class="sections"><a href="#banks">Banks</a><a href="#categorisation">Categorisation</a><a href="#telegram">Telegram</a><a href="#security">Security</a><a href="#access">Access &amp; HTTPS</a><a href="#backup">Backup</a><a href="#about">About</a></div>
+<div class="sections"><a href="#banks">Banks</a><a href="#categorisation">Categorisation</a><a href="#telegram">Telegram</a><a href="#ai">AI</a><a href="#security">Security</a><a href="#access">Access &amp; HTTPS</a><a href="#backup">Backup</a><a href="#about">About</a></div>
 
 <section class="card" id="banks">
   <h2>Bank connection (Plaid)</h2>
@@ -172,6 +172,30 @@ section.card{scroll-margin-top:12px}
     </div>
   </form>
   {{if .TgEnabled}}<form method="post" action="/settings/telegram/ask" class="row" style="margin-top:12px"><button>Ask me about one now</button></form>{{end}}
+</section>
+
+<section class="card" id="ai">
+  <h2>AI (LLM)</h2>
+  <p class="mut small">Optional. When set up, the Telegram bot's questions get an <strong>Ask AI</strong> button (or reply <code>ai</code>): the model suggests the most likely category with a short reason, and you choose whether to use it. Nothing is categorised by the AI on its own.</p>
+  <p class="mut small">Use <strong>Anthropic</strong> for Claude, or <strong>OpenAI-compatible</strong> for OpenAI, OpenRouter, or a model on your own computer (Ollama: <code>http://localhost:11434/v1</code>, LM Studio: <code>http://localhost:1234/v1</code>). Only when you press Ask AI, the provider receives that transaction's description, merchant, date and amount, plus your category names. A local model keeps all of that on your network. The API key is stored encrypted.</p>
+  <form method="post" action="/settings/ai" class="stack">
+    <div class="fields">
+      <label class="f">Provider<select name="provider">
+        <option value="" {{if eq .LLMProvider ""}}selected{{end}}>Off</option>
+        <option value="anthropic" {{if eq .LLMProvider "anthropic"}}selected{{end}}>Anthropic (Claude)</option>
+        <option value="openai" {{if eq .LLMProvider "openai"}}selected{{end}}>OpenAI-compatible</option>
+      </select></label>
+      <label class="f">Model<input name="model" value="{{.LLMModel}}" autocomplete="off" spellcheck="false" placeholder="Anthropic: {{.LLMDefaultModel}} · e.g. gpt-5-mini, llama3.2"></label>
+      <label class="f">API key<input name="api_key" type="password" autocomplete="new-password" spellcheck="false" placeholder="{{if .LLMKeySet}}•••••••• saved (leave blank to keep){{else}}not needed for most local models{{end}}"></label>
+      <label class="f">API address (optional)<input name="base_url" value="{{.LLMBaseURL}}" inputmode="url" autocomplete="off" spellcheck="false" placeholder="default: provider's own API"></label>
+    </div>
+    <div class="row">
+      <label class="small"><input type="checkbox" name="test" checked> Send a test question</label>
+      <button class="primary">Save</button>
+      {{if or .LLMProvider .LLMKeySet}}<label class="small mut"><input type="checkbox" name="remove"> Remove the AI settings</label>{{end}}
+      {{if .LLMEnabled}}<span class="ok small">Ready</span>{{end}}
+    </div>
+  </form>
 </section>
 
 <section class="card" id="security">
