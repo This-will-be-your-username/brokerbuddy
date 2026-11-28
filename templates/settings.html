@@ -189,6 +189,18 @@ section.card{scroll-margin-top:12px}
       <label class="f">API key<input name="api_key" type="password" autocomplete="new-password" spellcheck="false" placeholder="{{if .LLMKeySet}}•••••••• saved (leave blank to keep){{else}}not needed for most local models{{end}}"></label>
       <label class="f">API address (optional)<input name="base_url" value="{{.LLMBaseURL}}" inputmode="url" autocomplete="off" spellcheck="false" placeholder="default: provider's own API"></label>
     </div>
+    <p class="mut small"><strong>Web search</strong> (optional) helps with merchants the model doesn't know. <strong>Brave</strong>, <strong>Tavily</strong> or your own <strong>SearXNG</strong> are searched for the cleaned merchant name only (never the amount or date), and the top results are added to the question. <strong>Anthropic web search</strong> lets Claude search for itself (Anthropic charges per search; Claude is told to search for the business name only). For SearXNG, enable the <code>json</code> format in its <code>settings.yml</code>.</p>
+    <div class="fields">
+      <label class="f">Web search<select name="search">
+        <option value="" {{if eq .LLMSearch ""}}selected{{end}}>Off</option>
+        <option value="anthropic" {{if eq .LLMSearch "anthropic"}}selected{{end}}>Anthropic web search (Claude only)</option>
+        <option value="brave" {{if eq .LLMSearch "brave"}}selected{{end}}>Brave Search API</option>
+        <option value="tavily" {{if eq .LLMSearch "tavily"}}selected{{end}}>Tavily</option>
+        <option value="searxng" {{if eq .LLMSearch "searxng"}}selected{{end}}>SearXNG (self-hosted)</option>
+      </select></label>
+      <label class="f">Search API key (Brave, Tavily)<input name="search_key" type="password" autocomplete="new-password" spellcheck="false" placeholder="{{if or (and (eq .LLMSearch "brave") .LLMBraveKeySet) (and (eq .LLMSearch "tavily") .LLMTavilyKeySet)}}•••••••• saved (leave blank to keep){{else}}only for Brave or Tavily{{end}}"></label>
+      <label class="f">SearXNG address<input name="search_url" value="{{.LLMSearchURL}}" inputmode="url" autocomplete="off" spellcheck="false" placeholder="e.g. http://localhost:8888"></label>
+    </div>
     <div class="row">
       <label class="small"><input type="checkbox" name="test" checked> Send a test question</label>
       <button class="primary">Save</button>

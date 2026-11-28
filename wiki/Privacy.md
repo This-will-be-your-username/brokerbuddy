@@ -18,6 +18,7 @@ Only things you trigger, and only these:
 | Plaid (optional) | What Plaid needs to link your bank | Plaid | You set up Plaid |
 | Telegram bot (optional) | A daily question with one transaction's description, date and amount, and your replies | Telegram | You turn the bot on in Settings. The merchant lookup it does still sends only the cleaned name |
 | AI (optional) | One transaction's description, merchant, date and amount, plus your category names | The LLM provider you choose (nothing leaves your network with a local model) | You press *Ask AI* in Telegram, or save AI settings with the test ticked (a sample transaction) |
+| AI web search (optional) | The cleaned merchant name only | Brave Search, Tavily or your own SearXNG. With *Anthropic web search*, Claude writes the queries (told to use the business name only) and Anthropic runs them | You press *Ask AI* with web search turned on |
 | Let's Encrypt (optional) | Your domain and email | Let's Encrypt | You choose that access mode |
 
 Lookups **never** send amounts, dates, account names or numbers, the full bank description, or people's names. The cleaned name strips store numbers, suburbs, states and payment wording first. Results are cached, so the same merchant is not searched twice.

@@ -15,7 +15,7 @@ Your data stays on your computer, in one SQLite file. There are no paid services
 - **Dashboard, charts and a lender view** for income, spending and surplus.
 - **Mortgage planner:** borrowing capacity, stamp duty for every state, live market rates, and spending sliders that recalculate the price you could afford.
 - **Categorise from your phone:** an optional Telegram bot asks about one uncategorised transaction a day, suggests categories, and applies your reply.
-- **Optional AI help:** connect Claude, OpenAI or a local model (Ollama, LM Studio) and tap **Ask AI** in Telegram for the most likely category and why. You still make the choice.
+- **Optional AI help:** connect Claude, OpenAI or a local model (Ollama, LM Studio) and tap **Ask AI** in Telegram for the most likely category and why, optionally after a web search for the merchant. You still make the choice.
 - **Private and secure:** secrets encrypted at rest, password login, HTTPS (self-signed, Let's Encrypt or your own certificate), nothing personal ever sent to lookups.
 - **Light, dark and auto themes.** All configuration is in the web interface.
 

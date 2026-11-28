@@ -931,6 +931,12 @@ func (b *telegramBot) askAI(ctx context.Context, chat int64, seq int64) {
 	if ans.Reason != "" {
 		sb.WriteString("\n" + ans.Reason)
 	}
+	switch {
+	case ans.Searched != "":
+		sb.WriteString("\n\nChecked the web: " + ans.Searched + ".")
+	case ans.SearchErr != nil:
+		sb.WriteString("\n\nThe web search failed, so this is without it.")
+	}
 	sb.WriteString("\n\nUse it, pick another category, or skip.")
 	kb := [][]tgButton{
 		{{"Use " + ans.Category, fmt.Sprintf("cat:%d:%d", p.Seq, idx)}},

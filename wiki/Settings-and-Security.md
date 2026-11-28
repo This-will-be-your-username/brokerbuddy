@@ -88,6 +88,16 @@ Optionally connect a large language model in **Settings → AI**. The Telegram b
 - **Anthropic (Claude)**: paste an API key. The model defaults to `claude-opus-5-5`; enter another model ID to change it.
 - **OpenAI-compatible**: OpenAI, OpenRouter, or a local model. Enter the model name and, for anything other than OpenAI, the API address, such as `http://localhost:11434/v1` for Ollama or `http://localhost:1234/v1` for LM Studio. Local servers usually need no key.
 
-Saving with **Send a test question** ticked asks the model about a sample transaction so a wrong key, address or model shows up straight away. The API key is stored encrypted.
+### Web search
 
-**Privacy**: only when you press Ask AI, the provider receives that transaction's description, merchant, date and amount, plus your category names. A model running on your own network keeps all of that at home. See [Privacy](Privacy).
+Banks often shorten merchant names, and a model may not know a local business. Turn on **Web search** and the AI gets to check the web first:
+
+- **Brave Search API** or **Tavily**: paste that service's API key (both have free tiers). Before asking the model, BrokerBuddy searches for the cleaned merchant name (for example `blue door Australia`) and adds the top five results to the question.
+- **SearXNG (self-hosted)**: the same, using your own SearXNG instance. Enter its address, such as `http://localhost:8888`, and enable the `json` format under `search.formats` in SearXNG's `settings.yml`.
+- **Anthropic web search** (Claude only): Claude searches the web itself when it doesn't recognise the merchant, up to three searches per question. Anthropic charges for each search on top of the model's tokens.
+
+If a search fails, the AI still answers without it and the Telegram reply says so. When the web was used, the reply says which search and how many results. The test question on saving also runs the search, so a bad key or address shows up straight away.
+
+Saving with **Send a test question** ticked asks the model about a sample transaction so a wrong key, address or model shows up straight away. The API keys are stored encrypted.
+
+**Privacy**: only when you press Ask AI, the provider receives that transaction's description, merchant, date and amount, plus your category names. A model running on your own network keeps all of that at home. Brave, Tavily and SearXNG receive only the cleaned merchant name, never the amount, date or full description. With Anthropic web search, Claude writes the search queries and is told to search for the business name only. See [Privacy](Privacy).

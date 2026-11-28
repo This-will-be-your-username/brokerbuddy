@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -23,7 +24,8 @@ import (
 //                Ollama or LM Studio server, …)
 //
 // Privacy: the model's provider receives the transaction description, merchant, date and amount,
-// plus the list of category names. Nothing is sent unless you press "Ask AI".
+// plus the list of category names. Nothing is sent unless you press "Ask AI". An optional web
+// search (websearch.go) can add what the web says about the merchant.
 
 const (
 	llmProviderKey = "llm_provider" // "" (off) | "anthropic" | "openai"
@@ -93,6 +95,9 @@ type llmAnswer struct {
 	Category   string `json:"category"`
 	Confidence int    `json:"confidence"`
 	Reason     string `json:"reason"`
+
+	Searched  string `json:"-"` // how the web was searched, e.g. "Brave Search (5 results)"; "" if not
+	SearchErr error  `json:"-"` // a failed search; the model was asked without it
 }
 
 var llmClient = &http.Client{Timeout: 90 * time.Second}
@@ -102,7 +107,15 @@ Given one transaction, choose the single most likely category from the list prov
 Use what you know about the merchant (from its name, which may be abbreviated or truncated by the bank) and the amount.
 Reply with only a JSON object: {"category": "<one category from the list>", "confidence": <0-100>, "reason": "<one short sentence>"}.`
 
-func llmPrompt(t llmTxn, cats []string) string {
+// Added to the system prompt when search results are included in the question.
+const llmSearchResultsNote = `
+Web search results about the merchant may be included. Use them to work out what kind of business it is, but they can be about a different business with a similar name, so weigh them against the description and amount.`
+
+// Added to the system prompt when the model has Anthropic's web search tool.
+const llmSearchToolNote = `
+If you don't recognise the merchant, you may use web search to find out what kind of business it is. Search only for the business name (and its town, if the description includes one). Never put the amount, the date or other transaction details in a search. Finish with the JSON object only.`
+
+func llmPrompt(t llmTxn, cats []string, web string) string {
 	var sb strings.Builder
 	sb.WriteString("Transaction:\n")
 	fmt.Fprintf(&sb, "- Description: %s\n", t.Name)
@@ -127,6 +140,7 @@ func llmPrompt(t llmTxn, cats []string) string {
 			fmt.Fprintf(&sb, "- %s (%d%%): %s\n", h.Category, h.Score, h.Why)
 		}
 	}
+	sb.WriteString(web)
 	sb.WriteString("\nCategories:\n")
 	sb.WriteString(strings.Join(cats, "\n"))
 	return sb.String()
@@ -136,22 +150,64 @@ func llmPrompt(t llmTxn, cats []string) string {
 // always one of pickableCategories().
 func (a *app) llmSuggest(ctx context.Context, t llmTxn) (llmAnswer, error) {
 	c := a.llmConfig()
+	if c.Provider != "anthropic" && c.Provider != "openai" {
+		return llmAnswer{}, errors.New("AI is not set up (Settings → AI)")
+	}
 	cats := pickableCategories()
-	prompt := llmPrompt(t, cats)
+	system := llmSystemPrompt
+
+	// A separate web search first, its results added to the question.
+	var web, searched string
+	var searchErr error
+	svc := a.getSetting(llmSearchKey)
+	builtIn := svc == "anthropic" && c.Provider == "anthropic"
+	if svc != "" && svc != "anthropic" {
+		if q := webSearchQuery(t); q != "" {
+			sctx, cancel := context.WithTimeout(ctx, 25*time.Second)
+			res, err := a.webSearch(sctx, q)
+			cancel()
+			switch {
+			case err != nil:
+				searchErr = err
+				log.Println("ai web search:", err)
+			case len(res) == 0:
+				searched = webSearchNames[svc] + " (nothing found)"
+			default:
+				web = webContext(q, res)
+				searched = fmt.Sprintf("%s (%d %s)", webSearchNames[svc], len(res), plural(len(res), "result", "results"))
+				system += llmSearchResultsNote
+			}
+		}
+	}
+	if builtIn {
+		system += llmSearchToolNote
+	}
+	prompt := llmPrompt(t, cats, web)
+
 	var text string
 	var err error
-	switch c.Provider {
-	case "anthropic":
-		text, err = llmAnthropic(ctx, c, prompt, cats)
-	case "openai":
-		text, err = llmOpenAI(ctx, c, prompt)
-	default:
-		return llmAnswer{}, errors.New("AI is not set up (Settings → AI)")
+	if c.Provider == "anthropic" {
+		var searches int
+		text, searches, err = llmAnthropic(ctx, c, system, prompt, cats, builtIn)
+		if searches > 0 {
+			searched = fmt.Sprintf("%s (%d %s)", webSearchNames["anthropic"], searches, plural(searches, "search", "searches"))
+		}
+	} else {
+		text, err = llmOpenAI(ctx, c, system, prompt)
 	}
 	if err != nil {
 		return llmAnswer{}, err
 	}
-	return parseLLMAnswer(text, cats)
+	ans, err := parseLLMAnswer(text, cats)
+	ans.Searched, ans.SearchErr = searched, searchErr
+	return ans, err
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
 }
 
 // parseLLMAnswer pulls the JSON object out of the model's reply (tolerating code fences or a
@@ -222,61 +278,85 @@ func llmPost(ctx context.Context, endpoint string, headers map[string]string, in
 	return nil
 }
 
-func llmAnthropic(ctx context.Context, c llmConfig, prompt string, cats []string) (string, error) {
+// llmAnthropic asks Claude. With webSearch, Claude may search the web itself (Anthropic runs the
+// searches); it also returns how many searches were made.
+func llmAnthropic(ctx context.Context, c llmConfig, system, prompt string, cats []string, webSearch bool) (string, int, error) {
+	oc := map[string]any{"effort": "low"} // a quick classification
 	req := map[string]any{
-		"model":      c.Model,
-		"max_tokens": 4000,
-		"system":     llmSystemPrompt,
-		"messages":   []map[string]any{{"role": "user", "content": prompt}},
-		"output_config": map[string]any{
-			"effort": "low", // a quick classification
-			"format": map[string]any{
-				"type": "json_schema",
-				"schema": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"category":   map[string]any{"type": "string", "enum": cats},
-						"confidence": map[string]any{"type": "integer"},
-						"reason":     map[string]any{"type": "string"},
-					},
-					"required":             []string{"category", "confidence", "reason"},
-					"additionalProperties": false,
+		"model":         c.Model,
+		"max_tokens":    4000,
+		"system":        system,
+		"output_config": oc,
+	}
+	if webSearch {
+		// Search results come back with citations, which can't be combined with a JSON schema, so
+		// the answer's format comes from the prompt alone (parseLLMAnswer copes with extra text).
+		req["max_tokens"] = 16000
+		req["tools"] = []any{anthropicSearchTool(c.Model)}
+	} else {
+		oc["format"] = map[string]any{
+			"type": "json_schema",
+			"schema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"category":   map[string]any{"type": "string", "enum": cats},
+					"confidence": map[string]any{"type": "integer"},
+					"reason":     map[string]any{"type": "string"},
 				},
+				"required":             []string{"category", "confidence", "reason"},
+				"additionalProperties": false,
 			},
-		},
+		}
 	}
 	h := map[string]string{"x-api-key": c.APIKey, "anthropic-version": llmAnthropicVersion}
 	if llmFallbackModels[c.Model] {
 		req["fallbacks"] = "default"
 		h["anthropic-beta"] = "server-side-fallback-2026-07-01"
 	}
-	var out struct {
-		StopReason string `json:"stop_reason"`
-		Content    []struct {
-			Type string `json:"type"`
-			Text string `json:"text"`
-		} `json:"content"`
-	}
-	if err := llmPost(ctx, c.BaseURL+"/v1/messages", h, req, &out); err != nil {
-		return "", err
-	}
-	if out.StopReason == "refusal" {
-		return "", errors.New("the AI declined to answer")
-	}
-	var sb strings.Builder
-	for _, b := range out.Content {
-		if b.Type == "text" {
-			sb.WriteString(b.Text)
+	messages := []map[string]any{{"role": "user", "content": prompt}}
+	searches := 0
+	// A long server-side search can pause the turn ("pause_turn"); sending the reply back resumes it.
+	for range 3 {
+		req["messages"] = messages
+		var out struct {
+			StopReason string            `json:"stop_reason"`
+			Content    []json.RawMessage `json:"content"`
 		}
+		if err := llmPost(ctx, c.BaseURL+"/v1/messages", h, req, &out); err != nil {
+			return "", searches, err
+		}
+		var sb strings.Builder
+		for _, raw := range out.Content {
+			var b struct {
+				Type string `json:"type"`
+				Name string `json:"name"`
+				Text string `json:"text"`
+			}
+			json.Unmarshal(raw, &b)
+			switch {
+			case b.Type == "text":
+				sb.WriteString(b.Text)
+			case b.Type == "server_tool_use" && b.Name == "web_search":
+				searches++
+			}
+		}
+		switch out.StopReason {
+		case "refusal":
+			return "", searches, errors.New("the AI declined to answer")
+		case "pause_turn":
+			messages = append(messages, map[string]any{"role": "assistant", "content": out.Content})
+			continue
+		}
+		return sb.String(), searches, nil
 	}
-	return sb.String(), nil
+	return "", searches, errors.New("the AI took too long searching the web")
 }
 
-func llmOpenAI(ctx context.Context, c llmConfig, prompt string) (string, error) {
+func llmOpenAI(ctx context.Context, c llmConfig, system, prompt string) (string, error) {
 	req := map[string]any{
 		"model": c.Model,
 		"messages": []map[string]any{
-			{"role": "system", "content": llmSystemPrompt},
+			{"role": "system", "content": system},
 			{"role": "user", "content": prompt},
 		},
 	}
@@ -305,7 +385,8 @@ func llmOpenAI(ctx context.Context, c llmConfig, prompt string) (string, error) 
 func (a *app) saveLLM(w http.ResponseWriter, r *http.Request) {
 	fail := func(msg string) { settingsRedirect(w, r, "ai", msg, true) }
 	if r.FormValue("remove") == "on" {
-		for _, k := range []string{llmProviderKey, llmBaseURLKey, llmModelKey, llmAPIKeyKey} {
+		for _, k := range []string{llmProviderKey, llmBaseURLKey, llmModelKey, llmAPIKeyKey, llmSearchKey, llmSearchURLKey,
+			llmSearchKeyPrefix + "brave", llmSearchKeyPrefix + "tavily"} {
 			a.setSetting(k, "")
 		}
 		settingsRedirect(w, r, "ai", "AI settings removed.", false)
@@ -340,8 +421,39 @@ func (a *app) saveLLM(w http.ResponseWriter, r *http.Request) {
 		fail("Paste your Anthropic API key.")
 		return
 	}
+	search := r.FormValue("search")
+	searchURL := strings.TrimSpace(r.FormValue("search_url"))
+	searchKey := strings.TrimSpace(r.FormValue("search_key"))
+	switch search {
+	case "":
+	case "anthropic":
+		if provider != "anthropic" {
+			fail("Anthropic web search works only with the Anthropic provider. Choose Brave, Tavily or SearXNG instead.")
+			return
+		}
+	case "brave", "tavily":
+		if searchKey == "" && a.getSetting(llmSearchKeyPrefix+search) == "" {
+			fail("Paste your " + webSearchNames[search] + " API key.")
+			return
+		}
+	case "searxng":
+		u, err := url.Parse(searchURL)
+		if searchURL == "" || err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+			fail("Enter your SearXNG address, for example http://localhost:8888.")
+			return
+		}
+	default:
+		fail("Choose a web search option.")
+		return
+	}
 	if key != "" { // blank means "keep the saved key"
 		if err := a.setSecret(llmAPIKeyKey, key); err != nil {
+			fail(err.Error())
+			return
+		}
+	}
+	if searchKey != "" && (search == "brave" || search == "tavily") {
+		if err := a.setSecret(llmSearchKeyPrefix+search, searchKey); err != nil {
 			fail(err.Error())
 			return
 		}
@@ -349,6 +461,10 @@ func (a *app) saveLLM(w http.ResponseWriter, r *http.Request) {
 	a.setSetting(llmProviderKey, provider)
 	a.setSetting(llmBaseURLKey, base)
 	a.setSetting(llmModelKey, model)
+	a.setSetting(llmSearchKey, search)
+	if search == "searxng" {
+		a.setSetting(llmSearchURLKey, searchURL)
+	}
 
 	if r.FormValue("test") != "on" {
 		settingsRedirect(w, r, "ai", "AI settings saved.", false)
@@ -361,5 +477,15 @@ func (a *app) saveLLM(w http.ResponseWriter, r *http.Request) {
 		fail("Saved, but the test question failed: " + err.Error())
 		return
 	}
-	settingsRedirect(w, r, "ai", fmt.Sprintf("AI connected. Test: “WOOLWORTHS 1234 SYDNEY” → %s.", ans.Category), false)
+	msg := fmt.Sprintf("AI connected. Test: “WOOLWORTHS 1234 SYDNEY” → %s.", ans.Category)
+	switch {
+	case ans.SearchErr != nil:
+		fail(msg + " But the web search failed: " + ans.SearchErr.Error())
+		return
+	case ans.Searched != "":
+		msg += " Web search: " + ans.Searched + "."
+	case search == "anthropic":
+		msg += " (The model didn't need to search the web for this one.)"
+	}
+	settingsRedirect(w, r, "ai", msg, false)
 }

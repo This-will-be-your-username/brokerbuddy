@@ -344,6 +344,8 @@ func (a *app) settingsPage(w http.ResponseWriter, r *http.Request) {
 		"TgEnabled": a.tg.enabled(), "TgStatus": a.tg.status(), "TgHours": hoursOfDay(),
 		"LLMProvider": a.getSetting(llmProviderKey), "LLMBaseURL": a.getSetting(llmBaseURLKey), "LLMModel": a.getSetting(llmModelKey),
 		"LLMKeySet": a.getSetting(llmAPIKeyKey) != "", "LLMEnabled": a.llmEnabled(), "LLMDefaultModel": llmAnthropicModel,
+		"LLMSearch": a.getSetting(llmSearchKey), "LLMSearchURL": a.getSetting(llmSearchURLKey),
+		"LLMBraveKeySet": a.getSetting(llmSearchKeyPrefix+"brave") != "", "LLMTavilyKeySet": a.getSetting(llmSearchKeyPrefix+"tavily") != "",
 		"Status": a.net.Status(), "LocalAddr": a.net.localAddr, "DBPath": a.dbPath, "KeyPath": a.keyPath,
 	})
 }
